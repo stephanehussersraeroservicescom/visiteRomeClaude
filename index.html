@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rome Secrète | Audioguide Historique</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --terracotta: #C4785A;
+            --terracotta-dark: #A65D42;
+            --ochre: #D4A853;
+            --marble: #F5F2ED;
+            --travertine: #E8E3D9;
+            --roman-black: #1A1815;
+            --shadow: rgba(26, 24, 21, 0.08);
+            --gold: #BFA14A;
+            --deep-red: #8B2635;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--marble);
+            color: var(--roman-black);
+            line-height: 1.8;
+            overflow-x: hidden;
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--roman-black) 0%, #2D2824 50%, #3D3530 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+            opacity: 0.04;
+            pointer-events: none;
+        }
+
+        .hero-badge {
+            background: var(--terracotta);
+            color: var(--marble);
+            padding: 0.4rem 1rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            margin-bottom: 2rem;
+            animation: fadeInUp 1s ease-out 0.1s both;
+        }
+
+        .hero-subtitle {
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.85rem;
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            color: var(--ochre);
+            margin-bottom: 1.5rem;
+            animation: fadeInUp 1s ease-out 0.2s both;
+        }
+
+        .hero-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(3rem, 12vw, 8rem);
+            font-weight: 400;
+            color: var(--marble);
+            line-height: 1.05;
+            margin-bottom: 1rem;
+            animation: fadeInUp 1s ease-out 0.4s both;
+        }
+
+        .hero-title em {
+            font-style: italic;
+            color: var(--terracotta);
+        }
+
+        .hero-description {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.3rem;
+            font-style: italic;
+            color: rgba(245, 242, 237, 0.8);
+            max-width: 600px;
+            margin-bottom: 3rem;
+            animation: fadeInUp 1s ease-out 0.6s both;
+        }
+
+        .hero-meta {
+            display: flex;
+            gap: 3rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            animation: fadeInUp 1s ease-out 0.8s both;
+        }
+
+        .meta-item {
+            text-align: center;
+        }
+
+        .meta-value {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2.5rem;
+            color: var(--marble);
+            font-weight: 500;
+        }
+
+        .meta-label {
+            font-size: 0.7rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--ochre);
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            animation: bounce 2s infinite;
+        }
+
+        .scroll-indicator svg {
+            width: 28px;
+            height: 28px;
+            stroke: var(--ochre);
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateX(-50%) translateY(0); }
+            40% { transform: translateX(-50%) translateY(-10px); }
+            60% { transform: translateX(-50%) translateY(-5px); }
+        }
+
+        /* Audio Controls */
+        .audio-controls {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 1000;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .audio-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            border: none;
+            background: var(--terracotta);
+            color: var(--marble);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 20px rgba(196, 120, 90, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        .audio-btn:hover {
+            background: var(--terracotta-dark);
+            transform: scale(1.05);
+        }
+
+        .audio-btn svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .audio-btn.playing {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 4px 20px rgba(196, 120, 90, 0.4); }
+            50% { box-shadow: 0 4px 30px rgba(196, 120, 90, 0.7); }
+        }
+
+        /* Map Section */
+        .map-section {
+            padding: 5rem 2rem;
+            background: var(--travertine);
+        }
+
+        .section-header {
+            text-align: center;
+            max-width: 700px;
+            margin: 0 auto 3rem;
+        }
+
+        .section-label {
+            font-size: 0.75rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--terracotta);
+            margin-bottom: 0.75rem;
+        }
+
+        .section-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2.8rem;
+            font-weight: 400;
+            margin-bottom: 1rem;
+        }
+
+        .section-intro {
+            font-size: 1.05rem;
+            color: rgba(26, 24, 21, 0.7);
+            line-height: 1.7;
+        }
+
+        #map {
+            height: 450px;
+            border-radius: 16px;
+            box-shadow: 0 15px 50px var(--shadow);
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        /* Stops Section */
+        .stops-section {
+            padding: 6rem 2rem;
+            max-width: 850px;
+            margin: 0 auto;
+        }
+
+        .stop {
+            margin-bottom: 5rem;
+            padding-bottom: 5rem;
+            border-bottom: 1px solid rgba(26, 24, 21, 0.1);
+            position: relative;
+        }
+
+        .stop:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+
+        .stop-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stop-number {
+            width: 70px;
+            height: 70px;
+            min-width: 70px;
+            background: var(--roman-black);
+            color: var(--marble);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.8rem;
+            font-weight: 500;
+        }
+
+        .stop-title-block h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2.4rem;
+            font-weight: 400;
+            margin-bottom: 0.5rem;
+            line-height: 1.2;
+        }
+
+        .stop-meta {
+            display: flex;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            font-size: 0.85rem;
+            color: var(--terracotta);
+        }
+
+        .stop-meta span {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .stop-content {
+            padding-left: 0;
+        }
+
+        .stop-intro {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.25rem;
+            font-style: italic;
+            color: rgba(26, 24, 21, 0.8);
+            margin-bottom: 2rem;
+            padding-left: 1.5rem;
+            border-left: 3px solid var(--ochre);
+        }
+
+        .history-section {
+            margin-bottom: 2rem;
+        }
+
+        .history-section h4 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: var(--roman-black);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .history-section h4::before {
+            content: '';
+            width: 20px;
+            height: 2px;
+            background: var(--terracotta);
+        }
+
+        .history-section p {
+            margin-bottom: 1rem;
+            color: rgba(26, 24, 21, 0.85);
+            text-align: justify;
+        }
+
+        .secret-box {
+            background: linear-gradient(135deg, var(--roman-black) 0%, #2D2824 100%);
+            color: var(--marble);
+            padding: 2rem;
+            border-radius: 12px;
+            margin: 2rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .secret-box::before {
+            content: '🔮';
+            position: absolute;
+            top: -5px;
+            right: 15px;
+            font-size: 3.5rem;
+            opacity: 0.15;
+        }
+
+        .secret-box h4 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.3rem;
+            color: var(--ochre);
+            margin-bottom: 1rem;
+        }
+
+        .secret-box p {
+            font-size: 0.95rem;
+            line-height: 1.7;
+            opacity: 0.92;
+            margin-bottom: 0.75rem;
+        }
+
+        .secret-box p:last-child {
+            margin-bottom: 0;
+        }
+
+        .anecdote-box {
+            background: linear-gradient(135deg, var(--deep-red) 0%, #6B1D29 100%);
+            color: var(--marble);
+            padding: 2rem;
+            border-radius: 12px;
+            margin: 2rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .anecdote-box::before {
+            content: '📜';
+            position: absolute;
+            top: -5px;
+            right: 15px;
+            font-size: 3.5rem;
+            opacity: 0.15;
+        }
+
+        .anecdote-box h4 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.3rem;
+            color: var(--ochre);
+            margin-bottom: 1rem;
+        }
+
+        .anecdote-box p {
+            font-size: 0.95rem;
+            line-height: 1.7;
+            opacity: 0.92;
+            margin-bottom: 0.75rem;
+        }
+
+        .legend-box {
+            background: linear-gradient(135deg, #2C4A52 0%, #1E3339 100%);
+            color: var(--marble);
+            padding: 2rem;
+            border-radius: 12px;
+            margin: 2rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .legend-box::before {
+            content: '🌙';
+            position: absolute;
+            top: -5px;
+            right: 15px;
+            font-size: 3.5rem;
+            opacity: 0.15;
+        }
+
+        .legend-box h4 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.3rem;
+            color: #7EC8E3;
+            margin-bottom: 1rem;
+        }
+
+        .legend-box p {
+            font-size: 0.95rem;
+            line-height: 1.7;
+            opacity: 0.92;
+            margin-bottom: 0.75rem;
+        }
+
+        .photo-tip {
+            background: var(--travertine);
+            padding: 1.25rem 1.5rem;
+            border-radius: 10px;
+            margin: 1.5rem 0;
+            border-left: 4px solid var(--ochre);
+        }
+
+        .photo-tip strong {
+            color: var(--terracotta);
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .directions {
+            background: rgba(196, 120, 90, 0.12);
+            padding: 1.25rem 1.5rem;
+            border-radius: 10px;
+            margin-top: 2rem;
+            font-size: 0.95rem;
+        }
+
+        .directions strong {
+            color: var(--terracotta-dark);
+        }
+
+        .play-stop-btn {
+            background: var(--terracotta);
+            color: var(--marble);
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .play-stop-btn:hover {
+            background: var(--terracotta-dark);
+            transform: translateY(-2px);
+        }
+
+        .timeline-fact {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 1rem 0;
+            border-bottom: 1px dashed rgba(26, 24, 21, 0.15);
+        }
+
+        .timeline-fact:last-child {
+            border-bottom: none;
+        }
+
+        .timeline-date {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--terracotta);
+            min-width: 100px;
+        }
+
+        .timeline-text {
+            font-size: 0.95rem;
+            color: rgba(26, 24, 21, 0.8);
+        }
+
+        /* Quote block */
+        .quote-block {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.4rem;
+            font-style: italic;
+            text-align: center;
+            padding: 2rem;
+            margin: 2rem 0;
+            position: relative;
+            color: var(--roman-black);
+        }
+
+        .quote-block::before {
+            content: '"';
+            font-size: 4rem;
+            color: var(--ochre);
+            opacity: 0.3;
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .quote-block .author {
+            font-size: 1rem;
+            font-style: normal;
+            color: var(--terracotta);
+            margin-top: 1rem;
+            display: block;
+        }
+
+        /* Practical Section */
+        .practical-section {
+            background: var(--roman-black);
+            color: var(--marble);
+            padding: 5rem 2rem;
+        }
+
+        .practical-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .practical-card {
+            background: rgba(255,255,255,0.05);
+            padding: 2rem;
+            border-radius: 12px;
+        }
+
+        .practical-card h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.5rem;
+            color: var(--ochre);
+            margin-bottom: 1rem;
+        }
+
+        .practical-card ul {
+            list-style: none;
+        }
+
+        .practical-card li {
+            padding: 0.6rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 0.95rem;
+        }
+
+        .practical-card li:last-child {
+            border-bottom: none;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 3rem 2rem;
+            background: var(--travertine);
+            font-size: 0.85rem;
+            color: rgba(26, 24, 21, 0.6);
+        }
+
+        footer a {
+            color: var(--terracotta);
+        }
+
+        /* Progress bar */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 4px;
+            background: var(--terracotta);
+            z-index: 1001;
+            transition: width 0.1s ease;
+        }
+
+        /* Current stop indicator */
+        .stop.active .stop-number {
+            background: var(--terracotta);
+            box-shadow: 0 0 0 4px rgba(196, 120, 90, 0.3);
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 768px) {
+            .stop-header {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .stop-number {
+                width: 50px;
+                height: 50px;
+                min-width: 50px;
+                font-size: 1.4rem;
+            }
+
+            .stop-title-block h3 {
+                font-size: 1.8rem;
+            }
+
+            .hero-meta {
+                gap: 1.5rem;
+            }
+
+            .audio-controls {
+                bottom: 1rem;
+                right: 1rem;
+            }
+
+            .timeline-fact {
+                flex-direction: column;
+                gap: 0.3rem;
+            }
+
+            .timeline-date {
+                min-width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="progress-bar" id="progressBar"></div>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-badge">Version Enrichie</div>
+        <p class="hero-subtitle">Audioguide Historique</p>
+        <h1 class="hero-title">Rome <em>Secrète</em></h1>
+        <p class="hero-description">
+            Sept étapes extraordinaires à travers deux millénaires d'histoire, de mystères et d'anecdotes oubliées.
+        </p>
+        <div class="hero-meta">
+            <div class="meta-item">
+                <div class="meta-value">3h</div>
+                <div class="meta-label">Durée</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-value">4 km</div>
+                <div class="meta-label">Distance</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-value">7</div>
+                <div class="meta-label">Étapes</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-value">2000</div>
+                <div class="meta-label">Ans d'histoire</div>
+            </div>
+        </div>
+        <div class="scroll-indicator">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M7 13l5 5 5-5M7 6l5 5 5-5"/>
+            </svg>
+        </div>
+    </section>
+
+    <!-- Map Section -->
+    <section class="map-section">
+        <div class="section-header">
+            <p class="section-label">Votre Parcours</p>
+            <h2 class="section-title">Carte de l'Itinéraire</h2>
+            <p class="section-intro">De Via Cola di Rienzo à la Fontaine de Trevi, en passant par les monuments les plus emblématiques de Rome. Chaque point cache des siècles d'histoires.</p>
+        </div>
+        <div id="map"></div>
+    </section>
+
+    <!-- Stops Section -->
+    <section class="stops-section">
+        <div class="section-header">
+            <p class="section-label">L'Itinéraire Détaillé</p>
+            <h2 class="section-title">Sept Étapes Inoubliables</h2>
+        </div>
+
+        <!-- ========== STOP 1 ========== -->
+        <article class="stop" id="stop1">
+            <div class="stop-header">
+                <div class="stop-number">1</div>
+                <div class="stop-title-block">
+                    <h3>Via Cola di Rienzo & Quartier Prati</h3>
+                    <div class="stop-meta">
+                        <span>📍 Point de départ</span>
+                        <span>⏱ 10 min</span>
+                        <span>🏛️ XIXe siècle</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stop-content">
+                <p class="stop-intro">
+                    Vous êtes au cœur du "nouveau Rome", un quartier qui n'existait pas il y a 150 ans. Sous vos pieds, des prés où paissaient des moutons. Autour de vous, l'ambition d'une nation nouvelle.
+                </p>
+
+                <div class="history-section">
+                    <h4>L'Homme Derrière le Nom</h4>
+                    <p>Nicola di Lorenzo, dit <strong>Cola di Rienzo</strong> (1313-1354), était le fils d'un tavernier et d'une lavandière du Trastevere. Autodidacte passionné d'antiquités romaines, il passa sa jeunesse à déchiffrer les inscriptions latines sur les ruines, rêvant de ressusciter la grandeur de Rome.</p>
+                    <p>En 1347, profitant de l'absence du pape (exilé à Avignon) et du chaos politique, il mena une révolution populaire et se fit proclamer <strong>tribun du peuple</strong>. Pendant sept mois, il gouverna Rome, abolissant les privilèges des nobles, créant des tribunaux équitables, et envoyant des ambassadeurs dans toute l'Europe pour proposer une confédération des États italiens — une idée révolutionnaire pour l'époque.</p>
+                    <p>Son rêve s'effondra aussi vite qu'il était né. Trahi par son propre orgueil (il se couronna lui-même avec sept couronnes, s'aliénant le peuple), il fut chassé, puis revint au pouvoir en 1354, avant d'être lynché par la foule le 8 octobre de la même année. Son corps fut pendu, lapidé, puis brûlé pendant deux jours par les enfants du quartier juif.</p>
+                </div>
+
+                <div class="quote-block">
+                    "Il voulait que Rome redevienne la tête du monde, comme au temps des Césars."
+                    <span class="author">— Pétrarque, dans une lettre à Cola di Rienzo, 1347</span>
+                </div>
+
+                <div class="history-section">
+                    <h4>La Naissance du Quartier Prati</h4>
+                    <p>Jusqu'en 1870, cette zone s'appelait les <strong>Prati di Castello</strong> (les prés du château) — des terrains marécageux appartenant au Vatican, utilisés pour l'agriculture et les exercices militaires. Quand Rome devint capitale de l'Italie unifiée en 1871, le nouveau gouvernement avait besoin de loger des milliers de fonctionnaires, ministres et bureaucrates.</p>
+                    <p>Le quartier Prati fut conçu comme un manifeste de la "Troisième Rome" — après la Rome antique et la Rome papale, la Rome de l'Italie moderne. Les rues furent nommées d'après les héros du Risorgimento : Cavour, Garibaldi, Mazzini. L'architecture est délibérément sobre, rationnelle, "piémontaise" — en opposition au baroque exubérant de la Rome papale.</p>
+                </div>
+
+                <div class="secret-box">
+                    <h4>🔮 Le Secret des Numéros</h4>
+                    <p>Observez les numéros civiques : les pairs à gauche, les impairs à droite. Ce système "à la française" fut imposé quand Rome était sous domination napoléonienne (1809-1814). Napoléon voulait faire de Rome la "seconde capitale de l'Empire" après Paris.</p>
+                    <p>Ironiquement, ce système perdura après la chute de Napoléon car il était tout simplement plus pratique. La seule ville italienne à avoir résisté est Venise, qui utilise encore un système de numérotation unique par quartier — un même numéro peut exister six fois dans la ville !</p>
+                </div>
+
+                <div class="anecdote-box">
+                    <h4>📜 L'Anecdote Oubliée</h4>
+                    <p>En 1881, les ouvriers qui construisaient la Via Cola di Rienzo découvrirent une nécropole romaine du IIe siècle. Parmi les tombes, celle d'un certain <strong>Marcus Ulpius Phaedrus</strong>, affranchi de l'empereur Trajan, avec une inscription touchante de sa femme : "À mon époux très doux, avec qui j'ai vécu 36 ans sans une seule querelle."</p>
+                    <p>La tombe est aujourd'hui au Musée National Romain. Le couple repose probablement toujours sous le trottoir où vous marchez.</p>
+                </div>
+
+                <div class="photo-tip">
+                    <strong>📸 Conseil Photo</strong>
+                    Au n°190, levez les yeux : un superbe balcon Art Nouveau avec des mascarons de lion. Plus loin, au n°238, une pharmacie historique avec sa devanture en bois d'origine (1910). Les deux font d'excellents sujets "architecture cachée".
+                </div>
+
+                <div class="directions">
+                    <strong>➡️ Pour continuer :</strong> Descendez la Via Cola di Rienzo vers l'est (direction du Tibre). Au bout de la rue, traversez la Piazza Adriana. Le Castel Sant'Angelo apparaîtra devant vous, massif et circulaire. Comptez environ 8 minutes de marche.
+                </div>
+
+                <button class="play-stop-btn" onclick="speakStop(1)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Écouter cette étape
+                </button>
+            </div>
+        </article>
+
+        <!-- ========== STOP 2 ========== -->
+        <article class="stop" id="stop2">
+            <div class="stop-header">
+                <div class="stop-number">2</div>
+                <div class="stop-title-block">
+                    <h3>Castel Sant'Angelo</h3>
+                    <div class="stop-meta">
+                        <span>📍 Lungotevere Castello</span>
+                        <span>⏱ 25 min</span>
+                        <span>🏛️ 139 ap. J.-C.</span>
+                        <span>💰 Vue extérieure gratuite</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stop-content">
+                <p class="stop-intro">
+                    Devant vous se dresse le bâtiment qui a joué tous les rôles : tombeau impérial, forteresse, prison, trésor papal, et aujourd'hui musée. 1900 ans d'histoire concentrés dans un cylindre de travertin.
+                </p>
+
+                <div class="history-section">
+                    <h4>Le Mausolée d'Hadrien</h4>
+                    <p><strong>Hadrien</strong> (76-138) fut l'un des empereurs les plus cultivés et les plus voyageurs de Rome. Il parcourut chaque province de l'Empire, de la Bretagne à l'Égypte, construisant partout : le célèbre mur en Écosse, le Panthéon à Rome, la Villa Adriana à Tivoli. En 125, il commença la construction de son mausolée sur la rive droite du Tibre, face au Champ de Mars.</p>
+                    <p>Le bâtiment original mesurait 64 mètres de haut et était recouvert de marbre blanc de Luna (Carrare), surmonté d'un jardin planté de cyprès et couronné d'un quadrige en bronze conduit par l'empereur lui-même. Hadrien n'en vit jamais l'achèvement : il mourut en 138, et ce fut son successeur Antonin le Pieux qui l'inaugura en 139.</p>
+                </div>
+
+                <div class="timeline-fact">
+                    <span class="timeline-date">139-217</span>
+                    <span class="timeline-text">Le mausolée accueille les cendres de 7 empereurs : Hadrien, Antonin, Marc Aurèle, Commode, Septime Sévère, Geta et Caracalla.</span>
+                </div>
+                <div class="timeline-fact">
+                    <span class="timeline-date">270</span>
+                    <span class="timeline-text">L'empereur Aurélien intègre le mausolée dans les nouveaux murs de Rome. Il devient forteresse.</span>
+                </div>
+                <div class="timeline-fact">
+                    <span class="timeline-date">410</span>
+                    <span class="timeline-text">Lors du sac de Rome par Alaric, les défenseurs jettent les statues antiques sur les Wisigoths.</span>
+                </div>
+                <div class="timeline-fact">
+                    <span class="timeline-date">590</span>
+                    <span class="timeline-text">Apparition de l'archange Michel au pape Grégoire Ier. Le château prend son nom actuel.</span>
+                </div>
+
+                <div class="legend-box">
+                    <h4>🌙 La Légende de l'Ange</h4>
+                    <p>En 590, une terrible peste ravageait Rome. Le pape Grégoire Ier organisa une procession de pénitence à travers la ville. Alors qu'il passait devant le mausolée d'Hadrien, il vit apparaître au sommet l'<strong>archange Michel</strong>, rengainant son épée flamboyante — signe que la peste allait cesser.</p>
+                    <p>L'épidémie s'arrêta effectivement peu après (probablement une coïncidence saisonnière). Le château fut rebaptisé "Sant'Angelo" et une statue d'ange fut installée au sommet. L'ange actuel, en bronze, date de 1753 et fut réalisé par le sculpteur flamand Peter Anton von Verschaffelt.</p>
+                </div>
+
+                <div class="history-section">
+                    <h4>Le Passetto di Borgo : L'Échappatoire des Papes</h4>
+                    <p>Voyez ce chemin couvert sur les remparts, reliant le château à la colonnade de Saint-Pierre ? C'est le <strong>Passetto di Borgo</strong>, un corridor fortifié de 800 mètres construit en 1277 par le pape Nicolas III. Son usage le plus dramatique eut lieu le 6 mai 1527.</p>
+                    <p>Ce jour-là, les <strong>Lansquenets</strong> de Charles Quint — des mercenaires allemands, pour la plupart luthériens — déferlèrent sur Rome. Le pape Clément VII, encore en soutane blanche, courut à travers le Passetto pendant que ses 189 gardes suisses mouraient sur les marches de Saint-Pierre pour lui faire gagner quelques minutes. Seuls 42 survécurent.</p>
+                    <p>Le Sac de Rome qui suivit dura huit mois. Les soldats pillèrent les églises, violèrent les religieuses, utilisèrent les reliques comme jouets, et inscrivirent "Luther Papa" sur les fresques de Raphaël. Ce traumatisme mit fin à la Renaissance romaine et marqua le début de la Contre-Réforme.</p>
+                </div>
+
+                <div class="secret-box">
+                    <h4>🔮 Les Prisonniers Célèbres</h4>
+                    <p><strong>Benvenuto Cellini</strong> (1500-1571), le célèbre orfèvre et sculpteur, y fut emprisonné en 1538 pour avoir volé des joyaux pontificaux. Il s'évada spectaculairement en descendant avec des draps noués, se cassa la jambe, fut repris, et écrivit dans ses mémoires qu'un ange l'avait soutenu pendant sa chute.</p>
+                    <p><strong>Giordano Bruno</strong> (1548-1600), le philosophe qui affirmait que l'univers était infini et peuplé d'autres mondes, y passa six ans avant d'être brûlé vif sur le Campo de' Fiori.</p>
+                    <p><strong>Béatrice Cenci</strong> (1577-1599), noble romaine qui orchestra le meurtre de son père incestueux, y attendit son exécution. Malgré une pétition signée par des milliers de Romains, le pape Clément VIII la fit décapiter. Son fantôme errerait encore sur le Pont Sant'Angelo chaque 11 septembre.</p>
+                </div>
+
+                <div class="anecdote-box">
+                    <h4>📜 Le Trésor Caché</h4>
+                    <p>Au cœur du château se trouve la <strong>Salle du Trésor</strong>, où les papes gardaient leur fortune. En 1527, quand Clément VII s'y réfugia, le coffre contenait 400 000 ducats d'or. Pour payer la rançon exigée par les Impériaux, il dut faire fondre les tiares papales et les reliquaires.</p>
+                    <p>Aujourd'hui encore, les historiens suspectent l'existence de chambres secrètes non découvertes. En 1933, des ouvriers trouvèrent par accident un couloir muré contenant des documents du XVe siècle que personne n'avait vus depuis 500 ans.</p>
+                </div>
+
+                <div class="photo-tip">
+                    <strong>📸 Conseil Photo</strong>
+                    Le meilleur angle est depuis l'extrémité nord-ouest, côté Tibre. En fin d'après-midi, le soleil rasant illumine la façade tandis que l'ange se découpe en silhouette. Pour le Passetto, positionnez-vous sur le Lungotevere Castello et utilisez un zoom : le chemin de ronde se détache parfaitement contre le ciel.
+                </div>
+
+                <div class="directions">
+                    <strong>➡️ Pour continuer :</strong> Dirigez-vous vers le Pont Sant'Angelo, juste devant le château. Vous allez traverser le Tibre sur l'un des plus beaux ponts du monde.
+                </div>
+
+                <button class="play-stop-btn" onclick="speakStop(2)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Écouter cette étape
+                </button>
+            </div>
+        </article>
+
+        <!-- ========== STOP 3 ========== -->
+        <article class="stop" id="stop3">
+            <div class="stop-header">
+                <div class="stop-number">3</div>
+                <div class="stop-title-block">
+                    <h3>Ponte Sant'Angelo</h3>
+                    <div class="stop-meta">
+                        <span>📍 Sur le pont</span>
+                        <span>⏱ 15 min</span>
+                        <span>🏛️ 134 ap. J.-C. / XVIIe siècle</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stop-content">
+                <p class="stop-intro">
+                    Vous marchez sur le même pont qu'empruntèrent empereurs, papes, pèlerins et condamnés. Les anges du Bernin vous regardent avec une expression que leur créateur appelait "l'extase de la douleur".
+                </p>
+
+                <div class="history-section">
+                    <h4>Le Pont d'Hadrien</h4>
+                    <p>Ce pont fut construit par <strong>Hadrien</strong> en 134 ap. J.-C. pour relier son mausolée au cœur de Rome. À l'origine appelé <strong>Pons Aelius</strong> (du nom de famille d'Hadrien), il était orné de statues dorées et bordé de balustrades en bronze. C'était l'un des ponts les plus larges de l'Antiquité : trois voies de chars pouvaient y passer simultanément.</p>
+                    <p>Pendant 1400 ans, il resta le seul accès direct au Vatican, ce qui lui donna une importance stratégique immense. Lors du Jubilé de 1450, la foule des pèlerins fut si dense que les parapets cédèrent : 200 personnes moururent noyées ou piétinées. Le pape Nicolas V fit alors élargir le pont et démolir les maisons qui l'encombraient.</p>
+                </div>
+
+                <div class="history-section">
+                    <h4>Le Bernin et les Dix Anges</h4>
+                    <p>En 1667, le pape <strong>Clément IX</strong> commanda au <strong>Gian Lorenzo Bernini</strong> (1598-1680) la décoration du pont avec dix anges portant les instruments de la Passion du Christ. Le Bernin avait alors 69 ans et était au sommet de sa gloire — architecte de la colonnade de Saint-Pierre, sculpteur de l'Extase de Sainte Thérèse, artiste préféré de sept papes consécutifs.</p>
+                    <p>Chaque ange porte un objet différent : la colonne de la flagellation, les fouets, la couronne d'épines, le voile de Véronique, le vêtement et les dés, les clous, la croix, l'inscription INRI, l'éponge imbibée de vinaigre, et la lance de Longin.</p>
+                </div>
+
+                <div class="secret-box">
+                    <h4>🔮 Les Anges Disparus</h4>
+                    <p>Le Bernin sculpta personnellement deux anges : celui à la <strong>couronne d'épines</strong> et celui au <strong>titre de la croix</strong> (l'inscription INRI). Quand Clément IX les vit, il les trouva si beaux qu'il refusa de les exposer aux intempéries. Il ordonna qu'on les garde à l'abri et qu'on fasse des copies pour le pont.</p>
+                    <p>Les originaux se trouvent aujourd'hui dans l'église <strong>Sant'Andrea delle Fratte</strong>, près de la Piazza di Spagna. Si vous avez le temps, c'est un détour extraordinaire : voir les anges du Bernin sans la foule ni la pollution, dans le silence d'une église déserte.</p>
+                    <p>Regardez attentivement les visages des anges sur le pont : ils expriment tous une sorte de <strong>douleur extatique</strong>, cette combinaison de souffrance et de béatitude qui était la signature du Bernin. Chaque chevelure, chaque pli de drapé, chaque orteil est traité avec une précision obsessionnelle.</p>
+                </div>
+
+                <div class="anecdote-box">
+                    <h4>📜 Le Pont des Exécutions</h4>
+                    <p>Pendant des siècles, le Pont Sant'Angelo servit de <strong>gibet public</strong>. Les corps des condamnés à mort étaient exposés sur ses parapets, parfois pendant plusieurs jours, comme avertissement. Béatrice Cenci y fut exposée en 1599. Le brigand Mastro Titta y suspendit plus de 500 corps entre 1796 et 1864.</p>
+                    <p>Les Romains venaient assister aux exécutions comme à un spectacle. Les vendeurs ambulants proposaient des fruits et du vin. Les paris circulaient sur la durée de l'agonie. Un dicton romain disait : "Chi va per il ponte va per morire o per veder morire" — "Qui passe le pont va pour mourir ou pour voir mourir."</p>
+                </div>
+
+                <div class="legend-box">
+                    <h4>🌙 Les Fantômes du Pont</h4>
+                    <p>Selon la tradition romaine, le fantôme de <strong>Béatrice Cenci</strong> apparaît chaque année dans la nuit du 10 au 11 septembre (veille de son exécution), portant sa tête sous le bras. Plusieurs témoins affirment l'avoir vue au fil des siècles, toujours au même endroit : au centre du pont, face au château.</p>
+                    <p>Plus prosaïquement, le pont était réputé hanté par les <strong>âmes des noyés</strong> du Jubilé de 1450. Les gondoliers du Tibre (il y en avait jusqu'au XIXe siècle) refusaient de passer sous le pont après minuit.</p>
+                </div>
+
+                <div class="photo-tip">
+                    <strong>📸 Conseil Photo</strong>
+                    Au centre du pont, face au château, vous obtenez l'alignement parfait avec l'ange au sommet. Mais le meilleur cliché est depuis l'extrémité côté ville : les anges de chaque côté créent une perspective dramatique avec le dôme de Saint-Pierre en arrière-plan. Le matin, la lumière vient de derrière vous ; le soir, le dôme est en silhouette dorée.
+                </div>
+
+                <div class="directions">
+                    <strong>➡️ Pour continuer :</strong> Après le pont, prenez la rue directement en face : Via dei Coronari. C'est l'une des rues les plus authentiques de Rome, loin des foules. Marchez environ 400 mètres jusqu'à déboucher près de Piazza Navona.
+                </div>
+
+                <button class="play-stop-btn" onclick="speakStop(3)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Écouter cette étape
+                </button>
+            </div>
+        </article>
+
+        <!-- ========== STOP 4 ========== -->
+        <article class="stop" id="stop4">
+            <div class="stop-header">
+                <div class="stop-number">4</div>
+                <div class="stop-title-block">
+                    <h3>Piazza Navona</h3>
+                    <div class="stop-meta">
+                        <span>📍 Place centrale</span>
+                        <span>⏱ 25 min</span>
+                        <span>🏛️ 86 ap. J.-C. / XVIIe siècle</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stop-content">
+                <p class="stop-intro">
+                    Cette ellipse parfaite n'est pas un hasard : vous êtes dans un stade antique. Sous les pavés, 30 000 spectateurs acclamaient des athlètes grecs il y a 1900 ans. Aujourd'hui, les touristes ont remplacé les supporters.
+                </p>
+
+                <div class="history-section">
+                    <h4>Le Stade de Domitien</h4>
+                    <p>L'empereur <strong>Domitien</strong> (51-96) était fasciné par la culture grecque, en particulier par les jeux athlétiques. En 86 ap. J.-C., il fit construire ce stade pour accueillir des compétitions à la grecque : courses à pied, lutte, lancer du disque, poésie et musique. Il l'appela <strong>Circus Agonalis</strong> (cirque des jeux), d'où dérive le nom "Navona" (in agone → navone → navona).</p>
+                    <p>Le stade mesurait 265 mètres de long sur 106 de large et pouvait accueillir <strong>30 000 spectateurs</strong>. Contrairement au Colisée où l'on voyait des combats sanglants, ici les compétitions étaient "civilisées" à la grecque — ce qui choquait les Romains traditionalistes qui trouvaient ces jeux efféminés.</p>
+                    <p>Les fondations du stade existent toujours, visibles dans les sous-sols de certains bâtiments. Sous l'église Sant'Agnese in Agone, on peut encore voir les gradins antiques (entrée payante mais peu connue).</p>
+                </div>
+
+                <div class="history-section">
+                    <h4>La Fontaine des Quatre Fleuves</h4>
+                    <p>Au centre de la place, le chef-d'œuvre du <strong>Bernin</strong> (1651) : quatre géants de marbre représentant les plus grands fleuves des quatre continents connus — le <strong>Danube</strong> (Europe), le <strong>Gange</strong> (Asie), le <strong>Nil</strong> (Afrique) et le <strong>Rio de la Plata</strong> (Amériques).</p>
+                    <p>L'obélisque au centre est une copie romaine d'un original égyptien, commandée par Domitien pour son temple d'Isis au Champ de Mars. Il fut retrouvé en morceaux dans le Circus de Maxence sur la Via Appia et restauré par le Bernin.</p>
+                </div>
+
+                <div class="secret-box">
+                    <h4>🔮 Le Nil Voilé et la Rivalité Légendaire</h4>
+                    <p>Observez le Nil : il a la <strong>tête voilée</strong>. L'explication officielle ? Sa source était encore inconnue en 1651 (elle ne sera découverte qu'en 1858 par Speke). Mais une légende tenace raconte une autre histoire.</p>
+                    <p>Face à la fontaine se dresse l'église <strong>Sant'Agnese in Agone</strong>, conçue par <strong>Francesco Borromini</strong> (1599-1667), le grand rival du Bernin. Les deux génies se détestaient cordialement. Selon la légende, le Nil se voile la face pour ne pas voir l'horreur architecturale de Borromini, tandis que le Rio de la Plata lève le bras pour se protéger si l'église s'effondrait.</p>
+                    <p><strong>C'est faux.</strong> La fontaine fut achevée en 1651, et la façade de Borromini ne fut terminée qu'en 1657. Mais la légende en dit long sur l'intensité de leur rivalité. Borromini finit par se suicider en 1667, se jetant sur sa propre épée. Il survécut plusieurs heures et dicta ses dernières volontés, regrettant son geste.</p>
+                </div>
+
+                <div class="anecdote-box">
+                    <h4>📜 Le Lac de Navona</h4>
+                    <p>Du XVIIe au XIXe siècle, chaque week-end d'août, on bouchait les fontaines pour <strong>inonder la place</strong>. L'eau montait d'environ 50 centimètres, créant un lac artificiel où les nobles faisaient des tours en calèche et les enfants pataugeaient.</p>
+                    <p>Cette tradition, appelée "lago di Piazza Navona", servait officiellement à rafraîchir la ville pendant les canicules. En réalité, c'était surtout un spectacle mondain. Les familles aristocratiques rivalisaient d'élégance dans leurs carrosses aquatiques. Les gamins du peuple plongeaient pour récupérer les pièces lancées par les spectateurs. La police devait intervenir quand certains se mettaient à pêcher les poissons qu'on y avait relâchés.</p>
+                    <p>La dernière inondation eut lieu en 1866. Les autorités italiennes l'interdirent pour raisons d'hygiène.</p>
+                </div>
+
+                <div class="legend-box">
+                    <h4>🌙 Sainte Agnès et le Miracle</h4>
+                    <p>L'église Sant'Agnese marque l'endroit où, selon la tradition, <strong>Sainte Agnès</strong> fut martyrisée en 304. Cette jeune romaine de 12 ans refusa d'épouser le fils du préfet et de renoncer à sa foi chrétienne. Comme punition, elle fut exposée nue dans le stade.</p>
+                    <p>Miraculeusement, ses cheveux poussèrent instantanément pour couvrir son corps. Puis, quand on voulut la brûler vive, les flammes refusèrent de la toucher. Elle fut finalement décapitée. Son crâne est conservé dans l'église, exposé chaque 21 janvier (sa fête) avec celui de Sainte Catherine de Sienne.</p>
+                </div>
+
+                <div class="photo-tip">
+                    <strong>📸 Conseil Photo</strong>
+                    Depuis l'extrémité nord de la place, vous capturez les trois fontaines alignées avec l'église en fond. Pour les détails de la Fontaine des Quatre Fleuves, le meilleur angle est côté église (lumière de face l'après-midi). Cherchez le lion qui boit : c'est le détail le plus photographié, sur le côté Gange.
+                </div>
+
+                <div class="directions">
+                    <strong>➡️ Pour continuer :</strong> Quittez la place par le côté est, via la Corsia Agonale. Puis prenez Via del Salvatore et continuez tout droit. En 5 minutes, vous déboucherez sur la Piazza della Rotonda, face au Panthéon.
+                </div>
+
+                <button class="play-stop-btn" onclick="speakStop(4)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Écouter cette étape
+                </button>
+            </div>
+        </article>
+
+        <!-- ========== STOP 5 ========== -->
+        <article class="stop" id="stop5">
+            <div class="stop-header">
+                <div class="stop-number">5</div>
+                <div class="stop-title-block">
+                    <h3>Le Panthéon</h3>
+                    <div class="stop-meta">
+                        <span>📍 Piazza della Rotonda</span>
+                        <span>⏱ 30 min</span>
+                        <span>🏛️ ~125 ap. J.-C.</span>
+                        <span>💰 Entrée gratuite</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stop-content">
+                <p class="stop-intro">
+                    Le bâtiment le plus influent de l'histoire de l'architecture occidentale. 1900 ans après sa construction, son dôme reste le plus grand jamais réalisé en béton non armé. Comment ont-ils fait ? Cette question hante encore les ingénieurs.
+                </p>
+
+                <div class="history-section">
+                    <h4>Trois Panthéons</h4>
+                    <p>Le premier Panthéon fut construit en <strong>27 av. J.-C.</strong> par <strong>Agrippa</strong>, gendre d'Auguste, comme temple dédié aux dieux de la famille julienne (Mars, Vénus et le divin Jules César). L'inscription sur le fronton — "M·AGRIPPA·L·F·COS·TERTIVM·FECIT" (Marcus Agrippa, fils de Lucius, consul pour la troisième fois, a fait construire) — fait référence à ce premier bâtiment.</p>
+                    <p>Ce Panthéon brûla en 80 ap. J.-C. Un deuxième fut construit par Domitien, qui brûla également. Le bâtiment actuel est l'œuvre de l'empereur <strong>Hadrien</strong>, achevé vers <strong>125 ap. J.-C.</strong> Hadrien, par modestie (ou malice), conserva l'inscription originale d'Agrippa au lieu de mettre la sienne — ce qui trompa les historiens pendant des siècles.</p>
+                </div>
+
+                <div class="history-section">
+                    <h4>Le Miracle de l'Ingénierie</h4>
+                    <p>Le dôme du Panthéon mesure <strong>43,3 mètres</strong> de diamètre — exactement égal à sa hauteur intérieure. Une sphère parfaite de 43 mètres pourrait s'inscrire à l'intérieur. Cette harmonie géométrique n'est pas un hasard : elle symbolisait la perfection divine du cosmos.</p>
+                    <p>Comment ce dôme tient-il depuis 1900 ans sans armature métallique ?</p>
+                    <p><strong>1. Le béton romain</strong> : Composé de chaux, de pouzzolane (cendre volcanique) et de morceaux de roche, il est plus résistant que le béton moderne. Des études récentes ont découvert qu'il se "répare" lui-même : l'eau qui s'infiltre réagit avec la chaux pour colmater les fissures.</p>
+                    <p><strong>2. L'allègement progressif</strong> : La base du dôme est faite de béton lourd (basalte et travertin). Vers le sommet, on passe à des matériaux de plus en plus légers : tuf, brique, et enfin pierre ponce près de l'oculus. Le dôme pèse ainsi 4 500 tonnes, contre 10 000 si le béton était uniforme.</p>
+                    <p><strong>3. Les caissons</strong> : Les 140 caissons (carrés creux) dans le dôme ne sont pas décoratifs : ils allègent la structure de 25% tout en maintenant sa rigidité.</p>
+                    <p><strong>4. L'oculus</strong> : Ce trou de 9 mètres au sommet n'est pas une fantaisie : il supprime la partie la plus lourde et la plus fragile du dôme, convertissant les forces de compression en un anneau de tension stable.</p>
+                </div>
+
+                <div class="secret-box">
+                    <h4>🔮 La Pluie dans le Panthéon</h4>
+                    <p>Oui, quand il pleut, l'eau entre par l'oculus. Mais elle ne s'accumule pas : le sol du Panthéon est légèrement <strong>convexe</strong> (bombé vers le centre), et 22 <strong>trous de drainage</strong> quasi invisibles évacuent l'eau vers les égouts antiques qui fonctionnent encore.</p>
+                    <p>Par beau temps, l'oculus crée un "puits de lumière" qui se déplace sur les murs au fil de la journée, comme un cadran solaire géant. Le <strong>21 avril</strong>, jour anniversaire de la fondation de Rome, à midi exactement, le rayon de soleil traverse l'oculus et illumine la porte d'entrée. À ce moment, l'empereur entrait dans le temple, auréolé de lumière divine. Le Panthéon était une machine de propagande autant qu'un temple.</p>
+                </div>
+
+                <div class="anecdote-box">
+                    <h4>📜 Les Tombes Royales</h4>
+                    <p>Le Panthéon abrite les tombes de deux rois d'Italie (<strong>Victor-Emmanuel II</strong> et <strong>Umberto I</strong>) et d'une reine (<strong>Margherite de Savoie</strong>, celle de la pizza). Leurs gardes d'honneur se relaient encore aujourd'hui.</p>
+                    <p>Mais la tombe la plus visitée est celle de <strong>Raphaël</strong> (1483-1520), le peintre divin de la Renaissance. Il mourut à 37 ans, probablement de syphilis contractée avec sa maîtresse Margherita Luti (la "Fornarina"). Son épitaphe, composée par le cardinal Bembo, dit : "Ici gît Raphaël. Vivant, la Nature craignait d'être vaincue ; mort, elle craignait de mourir."</p>
+                    <p>À côté de Raphaël repose sa fiancée, Maria Bibbiena, qu'il n'épousa jamais malgré 10 ans de fiançailles — il préférait sa maîtresse. Maria mourut peu avant lui, certains disent de chagrin.</p>
+                </div>
+
+                <div class="legend-box">
+                    <h4>🌙 Le Trou du Diable</h4>
+                    <p>Une légende médiévale raconte que l'oculus fut créé par le <strong>Diable</strong> qui, piégé dans le temple lors de sa consécration chrétienne en 609, s'enfuit en perçant le toit. Le trou serait resté comme preuve de sa fuite.</p>
+                    <p>Une autre légende affirme que les démons ne peuvent pas entrer dans le Panthéon : l'oculus laisse passer assez de lumière divine pour les repousser. C'est pourquoi, dit-on, les Romains superstitieux s'y réfugiaient pendant les orages — la foudre étant censée être l'arme des démons.</p>
+                </div>
+
+                <div class="photo-tip">
+                    <strong>📸 Conseil Photo</strong>
+                    À l'intérieur, placez-vous au centre exact (un cercle est gravé au sol) et photographiez vers le haut. Entre 11h et 14h, le rayon de lumière balaie les murs — capturez ce "doigt de Dieu". Pour la façade, reculez jusqu'à la fontaine de la place : vous aurez le portique complet avec l'obélisque en premier plan.
+                </div>
+
+                <div class="directions">
+                    <strong>➡️ Pour continuer :</strong> En sortant du Panthéon, prenez à droite la Via del Seminario, puis continuez sur Via del Corso. Tournez à droite sur Via delle Muratte. La Fontaine de Trevi apparaîtra soudainement devant vous après 10 minutes de marche.
+                </div>
+
+                <button class="play-stop-btn" onclick="speakStop(5)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Écouter cette étape
+                </button>
+            </div>
+        </article>
+
+        <!-- ========== STOP 6 ========== -->
+        <article class="stop" id="stop6">
+            <div class="stop-header">
+                <div class="stop-number">6</div>
+                <div class="stop-title-block">
+                    <h3>Fontana di Trevi</h3>
+                    <div class="stop-meta">
+                        <span>📍 Piazza di Trevi</span>
+                        <span>⏱ 20 min</span>
+                        <span>🏛️ 1762</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stop-content">
+                <p class="stop-intro">
+                    La plus grande fontaine baroque du monde surgit d'une ruelle étroite comme une hallucination. 26 mètres de haut, 50 mètres de large, alimentée par un aqueduc construit il y a 2000 ans. Chaque jour, 3000 euros de pièces atterrissent dans son bassin.
+                </p>
+
+                <div class="history-section">
+                    <h4>L'Aqua Virgo : 2000 Ans d'Eau Courante</h4>
+                    <p>Cette fontaine marque le terminus de l'<strong>Aqua Virgo</strong> (Aqueduc de la Vierge), construit en <strong>19 av. J.-C.</strong> par Agrippa pour alimenter ses thermes au Champ de Mars. C'est le seul des 11 aqueducs antiques de Rome à n'avoir jamais cessé de fonctionner.</p>
+                    <p>Selon la légende, des soldats assoiffés furent guidés vers la source par une jeune vierge — d'où le nom. L'aqueduc court sur 21 kilomètres, principalement en souterrain, depuis les sources de Salone à l'est de Rome. Il déverse encore aujourd'hui <strong>80 millions de litres par jour</strong>.</p>
+                    <p>Le nom "Trevi" vient de "Tre Vie" (trois rues), car la place est à l'intersection de trois voies antiques. Pendant 1500 ans, une simple fontaine utilitaire marquait le terminus de l'aqueduc. La fontaine monumentale actuelle fut commandée par le pape <strong>Clément XII</strong> en 1732.</p>
+                </div>
+
+                <div class="history-section">
+                    <h4>Nicola Salvi et les 30 Ans de Construction</h4>
+                    <p>L'architecte <strong>Nicola Salvi</strong> (1697-1751) remporta le concours de design après des décennies de projets avortés — le Bernin lui-même avait proposé un dessin en 1641, mais les fonds manquèrent après la mort de son mécène. Salvi consacra le reste de sa vie à cette œuvre, vivant dans une cabane sur le chantier. Il mourut en 1751, aveugle et épuisé, 11 ans avant l'achèvement.</p>
+                    <p>La fontaine représente <strong>Neptune</strong> (ou Oceanus), dieu de la mer, sur un char tiré par deux hippocampes guidés par des tritons. L'un des chevaux est calme, l'autre agité — symbolisant les deux humeurs de la mer. Les statues des niches représentent l'Abondance (à gauche) et la Salubrité (à droite).</p>
+                </div>
+
+                <div class="secret-box">
+                    <h4>🔮 Les Secrets de la Fontaine</h4>
+                    <p><strong>L'As de Coupe :</strong> Sur le côté droit de la fontaine, cherchez un grand vase sculpté. C'est l'"Asso di Coppe" (As de Coupe). Selon la légende, Salvi l'ajouta pour bloquer la vue depuis la fenêtre d'un barbier voisin qui critiquait constamment son travail.</p>
+                    <p><strong>Les pièces :</strong> Environ <strong>3 000 € par jour</strong> sont jetés dans la fontaine (plus d'un million par an). L'argent est collecté chaque nuit par la Caritas et finance une banque alimentaire pour les pauvres de Rome. Voler des pièces est un délit passible de prison.</p>
+                    <p><strong>La tradition :</strong> Jetez une pièce de la main droite par-dessus l'épaule gauche. Une pièce = vous reviendrez à Rome. Deux pièces = vous trouverez l'amour à Rome. Trois pièces = vous vous marierez à Rome. Cette tradition date du film "Three Coins in the Fountain" (1954).</p>
+                </div>
+
+                <div class="anecdote-box">
+                    <h4>📜 La Dolce Vita</h4>
+                    <p>La scène la plus célèbre de l'histoire du cinéma italien fut tournée ici en août 1960 : <strong>Anita Ekberg</strong> entrant dans la fontaine en robe de soirée noire, invitant <strong>Marcello Mastroianni</strong> à la rejoindre, sous le regard médusé du jeune Fellini.</p>
+                    <p>Le tournage eut lieu en pleine nuit, avec l'eau coupée et remplacée par une eau tiède à cause du froid. Ekberg, suédoise habituée aux hivers scandinaves, ne broncha pas. Mastroianni, grelottant, dut porter une combinaison de plongée sous son costume et avaler une bouteille de vodka pour tenir.</p>
+                    <p>Depuis, des dizaines de touristes ont tenté d'imiter la scène. C'est interdit et passible d'une amende de 500 €. En 2015, un couple britannique y fut arrêté en train de faire des pâtes instantanées sur un réchaud de camping.</p>
+                </div>
+
+                <div class="legend-box">
+                    <h4>🌙 L'Eau des Amoureux</h4>
+                    <p>À droite de la fontaine, contre le mur, se trouve une petite fontaine rectangulaire : les <strong>"cannelle degli innamorati"</strong> (robinets des amoureux). Selon une tradition du XIXe siècle, les couples qui boivent ensemble à cette source resteront fidèles.</p>
+                    <p>Une autre tradition, plus ancienne, veut que les jeunes femmes romaines venaient boire cette eau pour "purifier" leur teint. L'Aqua Virgo était réputée être l'eau la plus pure de Rome — probablement vraie à l'époque, quand les autres sources étaient contaminées.</p>
+                </div>
+
+                <div class="photo-tip">
+                    <strong>📸 Conseil Photo</strong>
+                    La place est minuscule et bondée. Le meilleur moment : l'aube (6h-7h) ou très tard le soir (23h-minuit). Pour un angle sans foule, montez les escaliers de la Via Poli et photographiez en plongée. L'éclairage nocturne est spectaculaire — la fontaine fut l'une des premières de Rome à être illuminée électriquement (1871).
+                </div>
+
+                <div class="directions">
+                    <strong>➡️ Pour continuer :</strong> Remontez Via delle Muratte puis Via di Propaganda. Vous arriverez sur la Piazza di Spagna et les célèbres Escaliers en 10 minutes.
+                </div>
+
+                <button class="play-stop-btn" onclick="speakStop(6)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Écouter cette étape
+                </button>
+            </div>
+        </article>
+
+        <!-- ========== STOP 7 ========== -->
+        <article class="stop" id="stop7">
+            <div class="stop-header">
+                <div class="stop-number">7</div>
+                <div class="stop-title-block">
+                    <h3>Piazza di Spagna & Les Escaliers</h3>
+                    <div class="stop-meta">
+                        <span>📍 Fin du parcours</span>
+                        <span>⏱ 20 min</span>
+                        <span>🏛️ 1723-1726</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="stop-content">
+                <p class="stop-intro">
+                    Cent trente-cinq marches de travertin reliant l'ambassade d'Espagne à l'église de France. Un chef-d'œuvre diplomatique autant qu'architectural, où s'assirent Keats, Byron, Goethe, et des millions de touristes après eux.
+                </p>
+
+                <div class="history-section">
+                    <h4>Un Escalier Franco-Espagnol</h4>
+                    <p>La <strong>Piazza di Spagna</strong> tire son nom de l'ambassade d'Espagne près du Saint-Siège, installée ici depuis 1622. Au sommet de la colline se trouve l'église <strong>Trinità dei Monti</strong>, propriété de la France depuis 1494. Entre les deux, pendant 200 ans, un terrain vague escarpé et boueux.</p>
+                    <p>En 1660, la France proposa de financer un escalier monumental, surmonté d'une statue équestre de Louis XIV. Les Espagnols s'y opposèrent furieusement — pas question de glorifier le roi de France sur "leur" place. Le pape dut intervenir pour interdire le projet.</p>
+                    <p>Finalement, en 1723, un compromis fut trouvé : un escalier "neutre", financé par un legs du diplomate français Étienne Gueffier, conçu par l'architecte italien <strong>Francesco De Sanctis</strong>, sans statue controversée. Les 135 marches, avec leurs courbes élégantes et leurs paliers ornés de fleurs, furent achevées en 1726.</p>
+                </div>
+
+                <div class="history-section">
+                    <h4>La Colonie des Artistes</h4>
+                    <p>Au XVIIIe et XIXe siècles, le quartier autour des Escaliers devint le cœur de la <strong>Rome romantique</strong>. Des artistes, écrivains et musiciens de toute l'Europe s'y installèrent, attirés par les loyers bas et la lumière exceptionnelle.</p>
+                    <p><strong>Johann Wolfgang von Goethe</strong> vécut au 18 Via del Corso (1786-1788) pendant son "voyage en Italie" qui transforma sa vie et son œuvre. Il passait ses après-midi à dessiner sur les Escaliers.</p>
+                    <p><strong>John Keats</strong> (1795-1821), le poète romantique anglais, mourut de tuberculose à 25 ans dans la maison rose au pied des Escaliers (aujourd'hui le musée Keats-Shelley). Ses derniers mots furent : "Je sens déjà les fleurs pousser sur moi." Il est enterré au cimetière protestant de Rome avec l'épitaphe qu'il choisit : "Ici gît un homme dont le nom fut écrit sur l'eau."</p>
+                    <p><strong>Lord Byron</strong>, <strong>Percy Shelley</strong>, <strong>Stendhal</strong>, <strong>Franz Liszt</strong>, <strong>Hans Christian Andersen</strong>... tous fréquentèrent ces marches.</p>
+                </div>
+
+                <div class="secret-box">
+                    <h4>🔮 Les Secrets des Escaliers</h4>
+                    <p><strong>La Barcaccia :</strong> La fontaine en forme de barque au pied des Escaliers est l'œuvre de <strong>Pietro Bernini</strong> (le père du grand Bernin) et peut-être de son fils. Sa forme basse était imposée par la faible pression de l'eau à cet endroit. La légende dit qu'elle commémore une barque échouée ici lors de l'inondation de 1598.</p>
+                    <p><strong>Interdit de s'asseoir :</strong> Depuis 2019, il est officiellement interdit de s'asseoir sur les Escaliers. Amende : 250-400 €. La mesure vise à préserver le monument, abîmé par 15 millions de visiteurs annuels.</p>
+                    <p><strong>Les azalées :</strong> Chaque printemps (mi-avril à mi-mai), les Escaliers sont décorés de centaines de pots d'azalées roses et blanches — une tradition depuis 1956.</p>
+                </div>
+
+                <div class="anecdote-box">
+                    <h4>📜 Le Salon de Thé Anglais</h4>
+                    <p>À droite des Escaliers se trouve <strong>Babington's</strong>, le plus ancien salon de thé de Rome, fondé en 1893 par deux Anglaises, Isabel Cargill et Anna Maria Babington. À une époque où le thé était introuvable en Italie, elles l'importaient clandestinement dans leurs malles.</p>
+                    <p>Pendant la Seconde Guerre mondiale, Babington's devint un point de rencontre pour les espions et les réfugiés. Aujourd'hui, c'est l'endroit le plus cher de Rome pour un thé — comptez 15-20 € — mais vous buvez dans des tasses victoriennes authentiques, entourés de portraits de la reine et de meubles d'époque.</p>
+                </div>
+
+                <div class="legend-box">
+                    <h4>🌙 La Colonne de l'Immaculée</h4>
+                    <p>Sur la Piazza Mignanelli adjacente se dresse une colonne antique surmontée d'une statue de la Vierge, érigée en 1857 pour célébrer le dogme de l'Immaculée Conception. Chaque <strong>8 décembre</strong>, le pape vient déposer une couronne de fleurs au pied de la colonne.</p>
+                    <p>Jusqu'en 2013, c'étaient les pompiers de Rome qui, traditionnellement, montaient placer la couronne au bras de la Vierge avec leur grande échelle. Depuis, le pape se contente de la déposer à terre — la tradition a été simplifiée pour raisons de sécurité.</p>
+                </div>
+
+                <div class="photo-tip">
+                    <strong>📸 Conseil Photo</strong>
+                    Le meilleur angle pour les Escaliers : depuis la fontaine Barcaccia, en contre-plongée avec l'église Trinità dei Monti au sommet. Pour une vue plongeante sur la place et la ville, montez jusqu'à l'église. Le coucher de soleil depuis le parvis est spectaculaire — le dôme de Saint-Pierre est visible à l'horizon.
+                </div>
+
+                <div class="directions">
+                    <strong>🎉 Fin du Parcours !</strong> Vous avez parcouru 2000 ans d'histoire en 3 heures. Depuis la Piazza di Spagna, la Via Condotti vous mène vers les boutiques de luxe, ou la Via del Babuino vers la Piazza del Popolo. Pour un apéritif bien mérité, essayez le <strong>Caffè Greco</strong> (Via Condotti 86), le plus ancien café de Rome (1760), où sirotèrent Goethe, Byron, Casanova, et Fellini.
+                </div>
+
+                <button class="play-stop-btn" onclick="speakStop(7)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Écouter cette étape
+                </button>
+            </div>
+        </article>
+    </section>
+
+    <!-- Practical Section -->
+    <section class="practical-section">
+        <div class="section-header" style="color: var(--marble);">
+            <p class="section-label">Avant de Partir</p>
+            <h2 class="section-title" style="color: var(--marble);">Informations Pratiques</h2>
+        </div>
+        <div class="practical-grid">
+            <div class="practical-card">
+                <h3>🚶 Détails du Parcours</h3>
+                <ul>
+                    <li><strong>Distance totale :</strong> ~4 km</li>
+                    <li><strong>Durée estimée :</strong> 3 heures</li>
+                    <li><strong>Dénivelé :</strong> Faible (sauf Escaliers)</li>
+                    <li><strong>Difficulté :</strong> Facile</li>
+                    <li><strong>Meilleur moment :</strong> Matin tôt ou fin d'après-midi</li>
+                </ul>
+            </div>
+            <div class="practical-card">
+                <h3>💧 À Emporter</h3>
+                <ul>
+                    <li>Bouteille d'eau réutilisable</li>
+                    <li>Chapeau et crème solaire (été)</li>
+                    <li>Chaussures de marche confortables</li>
+                    <li>Foulard pour couvrir les épaules (églises)</li>
+                    <li>Pièces pour la Fontaine de Trevi !</li>
+                </ul>
+            </div>
+            <div class="practical-card">
+                <h3>☕ Pauses Recommandées</h3>
+                <ul>
+                    <li><strong>Caffè Sant'Eustachio</strong> — Près du Panthéon</li>
+                    <li><strong>Giolitti</strong> — Meilleures glaces (Via Uffici del Vicario)</li>
+                    <li><strong>Antico Caffè Greco</strong> — Via Condotti, depuis 1760</li>
+                    <li><strong>Babington's</strong> — Thé anglais (place d'Espagne)</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <p>Audioguide créé avec ❤️ pour une immersion dans l'histoire de Rome</p>
+        <p style="margin-top: 0.5rem;">Téléchargez ce fichier et ouvrez-le dans votre navigateur pour l'utiliser hors ligne</p>
+    </footer>
+
+    <!-- Audio Controls -->
+    <div class="audio-controls">
+        <button class="audio-btn" id="stopBtn" onclick="stopAudio()" title="Arrêter">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
+        </button>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Map initialization
+        const stops = [
+            { id: 1, name: "Via Cola di Rienzo", lat: 41.9068, lng: 12.4654 },
+            { id: 2, name: "Castel Sant'Angelo", lat: 41.9031, lng: 12.4663 },
+            { id: 3, name: "Ponte Sant'Angelo", lat: 41.9012, lng: 12.4665 },
+            { id: 4, name: "Piazza Navona", lat: 41.8992, lng: 12.4731 },
+            { id: 5, name: "Panthéon", lat: 41.8986, lng: 12.4769 },
+            { id: 6, name: "Fontana di Trevi", lat: 41.9009, lng: 12.4833 },
+            { id: 7, name: "Piazza di Spagna", lat: 41.9057, lng: 12.4823 }
+        ];
+
+        const map = L.map('map').setView([41.9020, 12.4750], 15);
+        
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(map);
+
+        // Custom marker icon
+        const createIcon = (number) => L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="
+                background: #C4785A;
+                color: white;
+                width: 36px;
+                height: 36px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                font-size: 15px;
+                box-shadow: 0 3px 12px rgba(0,0,0,0.3);
+                border: 3px solid white;
+            ">${number}</div>`,
+            iconSize: [36, 36],
+            iconAnchor: [18, 18]
+        });
+
+        // Add markers
+        stops.forEach(stop => {
+            L.marker([stop.lat, stop.lng], { icon: createIcon(stop.id) })
+                .addTo(map)
+                .bindPopup(`<strong>${stop.id}. ${stop.name}</strong>`)
+                .on('click', () => {
+                    document.getElementById(`stop${stop.id}`).scrollIntoView({ behavior: 'smooth' });
+                });
+        });
+
+        // Draw route line
+        const routeCoords = stops.map(s => [s.lat, s.lng]);
+        L.polyline(routeCoords, {
+            color: '#C4785A',
+            weight: 4,
+            opacity: 0.8,
+            dashArray: '12, 8'
+        }).addTo(map);
+
+        // Speech synthesis for audio guide
+        let synth = window.speechSynthesis;
+        let currentUtterance = null;
+
+        function speakStop(stopNum) {
+            stopAudio();
+            
+            const stopEl = document.getElementById(`stop${stopNum}`);
+            if (!stopEl) return;
+
+            // Get all text content from the stop
+            const intro = stopEl.querySelector('.stop-intro')?.textContent || '';
+            const historySections = Array.from(stopEl.querySelectorAll('.history-section p')).map(p => p.textContent).join(' ');
+            const secretBox = stopEl.querySelector('.secret-box p')?.textContent || '';
+            const anecdoteBox = stopEl.querySelector('.anecdote-box p')?.textContent || '';
+            
+            const fullText = `${intro} ${historySections} ${secretBox} ${anecdoteBox}`;
+            
+            currentUtterance = new SpeechSynthesisUtterance(fullText.substring(0, 3000)); // Limit for speech
+            currentUtterance.lang = 'fr-FR';
+            currentUtterance.rate = 0.85;
+            currentUtterance.pitch = 1;
+            
+            // Try to use a French voice
+            const voices = synth.getVoices();
+            const frenchVoice = voices.find(v => v.lang.startsWith('fr'));
+            if (frenchVoice) currentUtterance.voice = frenchVoice;
+
+            synth.speak(currentUtterance);
+            
+            // Highlight current stop
+            document.querySelectorAll('.stop').forEach(s => s.classList.remove('active'));
+            stopEl.classList.add('active');
+            
+            // Scroll to stop
+            stopEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        function stopAudio() {
+            synth.cancel();
+            document.querySelectorAll('.stop').forEach(s => s.classList.remove('active'));
+        }
+
+        // Progress bar
+        window.addEventListener('scroll', () => {
+            const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+            const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+            const scrolled = (winScroll / height) * 100;
+            document.getElementById('progressBar').style.width = scrolled + '%';
+        });
+
+        // Load voices
+        if (synth.onvoiceschanged !== undefined) {
+            synth.onvoiceschanged = () => synth.getVoices();
+        }
+    </script>
+</body>
+</html>
