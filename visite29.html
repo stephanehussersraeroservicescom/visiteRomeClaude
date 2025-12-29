@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rome à Pied | Audioguide Secret</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --terracotta: #C4785A;
+            --terracotta-dark: #A65D42;
+            --ochre: #D4A853;
+            --marble: #F5F2ED;
+            --travertine: #E8E3D9;
+            --roman-black: #1A1815;
+            --shadow: rgba(26, 24, 21, 0.08);
+            --gold: #BFA14A;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: var(--marble);
+            color: var(--roman-black);
+            line-height: 1.7;
+            overflow-x: hidden;
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            background: linear-gradient(135deg, var(--roman-black) 0%, #2D2824 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 2rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+            opacity: 0.03;
+            pointer-events: none;
+        }
+
+        .hero-subtitle {
+            font-family: 'DM Sans', sans-serif;
+            font-size: 0.85rem;
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            color: var(--ochre);
+            margin-bottom: 1.5rem;
+            animation: fadeInUp 1s ease-out 0.2s both;
+        }
+
+        .hero-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: clamp(3rem, 10vw, 7rem);
+            font-weight: 400;
+            color: var(--marble);
+            line-height: 1.1;
+            margin-bottom: 1rem;
+            animation: fadeInUp 1s ease-out 0.4s both;
+        }
+
+        .hero-title em {
+            font-style: italic;
+            color: var(--terracotta);
+        }
+
+        .hero-description {
+            font-size: 1.1rem;
+            color: rgba(245, 242, 237, 0.7);
+            max-width: 500px;
+            margin-bottom: 2.5rem;
+            animation: fadeInUp 1s ease-out 0.6s both;
+        }
+
+        .hero-meta {
+            display: flex;
+            gap: 2rem;
+            flex-wrap: wrap;
+            justify-content: center;
+            animation: fadeInUp 1s ease-out 0.8s both;
+        }
+
+        .meta-item {
+            text-align: center;
+        }
+
+        .meta-value {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2rem;
+            color: var(--marble);
+        }
+
+        .meta-label {
+            font-size: 0.75rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--ochre);
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%);
+            animation: bounce 2s infinite;
+        }
+
+        .scroll-indicator svg {
+            width: 24px;
+            height: 24px;
+            stroke: var(--ochre);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateX(-50%) translateY(0); }
+            40% { transform: translateX(-50%) translateY(-10px); }
+            60% { transform: translateX(-50%) translateY(-5px); }
+        }
+
+        /* Audio Controls */
+        .audio-controls {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 1000;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .audio-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            border: none;
+            background: var(--terracotta);
+            color: var(--marble);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 20px rgba(196, 120, 90, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        .audio-btn:hover {
+            background: var(--terracotta-dark);
+            transform: scale(1.05);
+        }
+
+        .audio-btn svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .audio-btn.playing {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 4px 20px rgba(196, 120, 90, 0.4); }
+            50% { box-shadow: 0 4px 30px rgba(196, 120, 90, 0.7); }
+        }
+
+        /* Map Section */
+        .map-section {
+            padding: 4rem 2rem;
+            background: var(--travertine);
+        }
+
+        .section-header {
+            text-align: center;
+            max-width: 600px;
+            margin: 0 auto 3rem;
+        }
+
+        .section-label {
+            font-size: 0.75rem;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--terracotta);
+            margin-bottom: 0.5rem;
+        }
+
+        .section-title {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2.5rem;
+            font-weight: 400;
+        }
+
+        #map {
+            height: 500px;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px var(--shadow);
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        /* Stops Section */
+        .stops-section {
+            padding: 6rem 2rem;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .stop {
+            display: grid;
+            grid-template-columns: 80px 1fr;
+            gap: 2rem;
+            margin-bottom: 4rem;
+            padding-bottom: 4rem;
+            border-bottom: 1px solid rgba(26, 24, 21, 0.1);
+            position: relative;
+        }
+
+        .stop:last-child {
+            border-bottom: none;
+        }
+
+        .stop-number {
+            width: 80px;
+            height: 80px;
+            background: var(--roman-black);
+            color: var(--marble);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2rem;
+            position: sticky;
+            top: 2rem;
+        }
+
+        .stop-content h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 2rem;
+            font-weight: 400;
+            margin-bottom: 0.5rem;
+        }
+
+        .stop-meta {
+            display: flex;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.85rem;
+            color: var(--terracotta);
+        }
+
+        .stop-meta span {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .stop-description {
+            margin-bottom: 1.5rem;
+            color: rgba(26, 24, 21, 0.85);
+        }
+
+        .secret-box {
+            background: linear-gradient(135deg, var(--roman-black) 0%, #2D2824 100%);
+            color: var(--marble);
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin: 1.5rem 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .secret-box::before {
+            content: '🔮';
+            position: absolute;
+            top: -10px;
+            right: 10px;
+            font-size: 3rem;
+            opacity: 0.2;
+        }
+
+        .secret-box h4 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.2rem;
+            color: var(--ochre);
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .secret-box p {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            opacity: 0.9;
+        }
+
+        .photo-tip {
+            background: var(--travertine);
+            padding: 1rem 1.25rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+            border-left: 3px solid var(--ochre);
+            font-size: 0.9rem;
+        }
+
+        .photo-tip strong {
+            color: var(--terracotta);
+        }
+
+        .directions {
+            background: rgba(196, 120, 90, 0.1);
+            padding: 1rem 1.25rem;
+            border-radius: 8px;
+            margin-top: 1.5rem;
+            font-size: 0.9rem;
+        }
+
+        .directions strong {
+            color: var(--terracotta-dark);
+        }
+
+        .play-stop-btn {
+            background: var(--terracotta);
+            color: var(--marble);
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin-top: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .play-stop-btn:hover {
+            background: var(--terracotta-dark);
+        }
+
+        /* Practical Info */
+        .practical-section {
+            background: var(--roman-black);
+            color: var(--marble);
+            padding: 5rem 2rem;
+        }
+
+        .practical-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .practical-card {
+            background: rgba(255,255,255,0.05);
+            padding: 2rem;
+            border-radius: 12px;
+        }
+
+        .practical-card h3 {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.5rem;
+            color: var(--ochre);
+            margin-bottom: 1rem;
+        }
+
+        .practical-card ul {
+            list-style: none;
+        }
+
+        .practical-card li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-size: 0.95rem;
+        }
+
+        .practical-card li:last-child {
+            border-bottom: none;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 3rem 2rem;
+            background: var(--travertine);
+            font-size: 0.85rem;
+            color: rgba(26, 24, 21, 0.6);
+        }
+
+        footer a {
+            color: var(--terracotta);
+        }
+
+        /* Video embed */
+        .video-embed {
+            margin: 1.5rem 0;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px var(--shadow);
+        }
+
+        .video-embed iframe {
+            width: 100%;
+            aspect-ratio: 16/9;
+            border: none;
+        }
+
+        /* Image gallery placeholder */
+        .image-gallery {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            margin: 1.5rem 0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .image-gallery img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+
+        .image-gallery img:hover {
+            transform: scale(1.05);
+        }
+
+        /* Mobile adjustments */
+        @media (max-width: 768px) {
+            .stop {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+
+            .stop-number {
+                width: 50px;
+                height: 50px;
+                font-size: 1.5rem;
+                position: relative;
+                top: 0;
+            }
+
+            .hero-meta {
+                gap: 1rem;
+            }
+
+            .audio-controls {
+                bottom: 1rem;
+                right: 1rem;
+            }
+        }
+
+        /* Progress bar */
+        .progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            background: var(--terracotta);
+            z-index: 1001;
+            transition: width 0.1s ease;
+        }
+
+        /* Current stop indicator */
+        .stop.active .stop-number {
+            background: var(--terracotta);
+            box-shadow: 0 0 0 4px rgba(196, 120, 90, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="progress-bar" id="progressBar"></div>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <p class="hero-subtitle">Audioguide Secret</p>
+        <h1 class="hero-title">Rome <em>à Pied</em></h1>
+        <p class="hero-description">
+            Un parcours de 12 étapes depuis Via Cola di Rienzo, révélant les secrets que même les Romains ont oubliés.
+        </p>
+        <div class="hero-meta">
+            <div class="meta-item">
+                <div class="meta-value">3-4h</div>
+                <div class="meta-label">Durée</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-value">6 km</div>
+                <div class="meta-label">Distance</div>
+            </div>
+            <div class="meta-item">
+                <div class="meta-value">12</div>
+                <div class="meta-label">Étapes</div>
+            </div>
+        </div>
+        <div class="scroll-indicator">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M7 13l5 5 5-5M7 6l5 5 5-5"/>
+            </svg>
+        </div>
+    </section>
+
+    <!-- Map Section -->
+    <section class="map-section">
+        <div class="section-header">
+            <p class="section-label">Votre Parcours</p>
+            <h2 class="section-title">Carte Interactive</h2>
+        </div>
+        <div id="map"></div>
+    </section>
+
+    <!-- Stops Section -->
+    <section class="stops-section">
+        <div class="section-header">
+            <p class="section-label">12 Étapes</p>
+            <h2 class="section-title">L'Itinéraire Complet</h2>
+        </div>
+
+        <!-- STOP 1 -->
+        <article class="stop" id="stop1" data-audio="Bienvenue sur la Via Cola di Rienzo, l'une des artères commerçantes les plus élégantes de Rome. Cette rue porte le nom de Cola di Rienzo, un tribun du 14ème siècle qui rêvait de restaurer la République romaine. Regardez les immeubles autour de vous : ce quartier de Prati a été entièrement construit après 1870, quand Rome est devenue capitale de l'Italie. Avant, ici, il n'y avait que des prés. Dirigez-vous vers le Tibre en suivant la via Cola di Rienzo vers l'est.">
+            <div class="stop-number">1</div>
+            <div class="stop-content">
+                <h3>Via Cola di Rienzo</h3>
+                <div class="stop-meta">
+                    <span>📍 Point de départ</span>
+                    <span>⏱ 5 min</span>
+                </div>
+                <p class="stop-description">
+                    Vous êtes au cœur du quartier <strong>Prati</strong>, le "nouveau Rome" construit après 1870. Cette artère élégante porte le nom de <em>Nicola di Lorenzo</em>, dit Cola di Rienzo, un notaire devenu tribun qui, au XIVe siècle, tenta de restaurer la République romaine antique. Il fut assassiné par la foule en 1354, mais son rêve d'unité italienne inspira le Risorgimento 500 ans plus tard.
+                </p>
+
+                <div class="secret-box">
+                    <h4>🔮 Le Secret</h4>
+                    <p>Regardez les numéros civiques : les immeubles pairs sont à gauche, impairs à droite. C'est le système napoléonien, imposé quand Rome était française (1809-1814). La plupart des villes italiennes ont gardé ce système... sauf Venise qui refuse catégoriquement.</p>
+                </div>
+
+                <div class="photo-tip">
+                    <strong>📸 Conseil photo :</strong> Au n°190, levez la tête : un magnifique balcon Art Nouveau avec des têtes de lion. Parfait pour une photo "architecture cachée".
+                </div>
+
+                <div class="directions">
+                    <strong>➡️ Pour continuer :</strong> Descendez la Via Cola di Rienzo vers le Tibre (direction est). Au bout, traversez la Piazza Adriana. Le Château Saint-Ange apparaîtra devant vous (~8 minutes de marche).
+                </div>
+
+                <button class="play-stop-btn" onclick="speakStop(1)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Écouter
+                </button>
+            </div>
+        </article>
+
+        <!-- STOP 2 -->
+        <article class="stop" id="stop2" data-audio="Vous voici devant le Castel Sant'Angelo, l'un des bâtiments les plus fascinants de Rome. Construit en 139 après Jésus-Christ comme mausolée pour l'empereur Hadrien, il a servi de forteresse, de prison, de résidence papale et même de coffre-fort. En 590, le pape Grégoire le Grand vit l'archange Michel au sommet, rengainant son épée pour signifier la fin d'une terrible peste. L'ange de bronze que vous voyez date de 1753. Un passage secret, le Passetto di Borgo, relie le château au Vatican. Les papes l'utilisaient pour fuir en cas de danger.">
+            <div class="stop-number">2</div>
+            <div class="stop-content">
+                <h3>Castel Sant'Angelo</h3>
+                <div class="stop-meta">
+                    <span>📍 Lungotevere Castello</span>
+                    <span>⏱ 15 min</span>
+                    <span>💰 Vue extérieure gratuite</span>
+                </div>
+                <p class="stop-description">
+                    Ce cylindre massif de travertin fut le <strong>mausolée d'Hadrien</strong>, construit en 139 ap. J.-C. L'empereur voyageur, celui qui construisit le mur en Écosse, y reposa avec sa famille pendant 400 ans. Puis il devint forteresse, prison papale, et même coffre-fort du Vatican.
+                </p>
+
+                <div class="secret-box">
+                    <h4>🔮 Le Secret</h4>
+                    <p>Voyez ce chemin couvert sur les remparts, reliant le château au Vatican ? C'est le <strong>Passetto di Borgo</strong>, un passage secret de 800 mètres. En 1527, le pape Clément VII l'utilisa pour fuir les troupes de Charles Quint pendant le terrible Sac de Rome. Il courut en soutane, poursuivi par des lansquenets allemands, pendant que ses gardes suisses mouraient pour le protéger.</p>
+                </div>
+
+                <div class="secret-box">
+                    <h4>🎭 L'Anecdote</h4>
+                    <p>Béatrice Cenci, noble romaine, fut emprisonnée ici en 1599 pour avoir orchestré le meurtre de son père qui l'abusait. Malgré une pétition massive, le pape Clément VIII la fit décapiter. Aujourd'hui encore, son fantôme errerait sur le Pont Sant'Angelo la nuit du 11 septembre, date de son exécution.</p>
+                </div>
+
+                <div class="photo-tip">
+                    <strong>📸 Conseil photo :</strong> Positionnez-vous à l'angle nord-ouest, côté Tibre. En fin d'après-midi, le soleil éclaire la façade et l'ange en contre-jour crée une silhouette dramatique.
+                </div>
+
+                <div class="directions">
+                    <strong>➡️ Pour continuer :</strong> Traversez le Pont Sant'Angelo. Prenez le temps d'admirer les anges du Bernin. De l'autre côté, continuez tout droit sur Via dei Coronari.
+                </div>
+
+                <button class="play-stop-btn" onclick="speakStop(2)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Écouter
+                </button>
+            </div>
+        </article>
+
+        <!-- STOP 3 -->
+        <article class="stop" id="stop3" data-audio="Vous marchez sur le Ponte Sant'Angelo, l'un des plus beaux ponts du monde. Construit par Hadrien en 134 pour accéder à son mausolée, il fut décoré au 17ème siècle par 10 anges sculptés sous la direction du Bernin. Chaque ange porte un instrument de la Passion du Christ. Regardez leurs visages : le Bernin leur donna une expression de douleur extatique qui lui était typique. Seuls deux anges furent sculptés de sa propre main : l'ange à la couronne d'épines et l'ange au titre de la croix. Ils furent jugés trop beaux pour rester dehors et sont aujourd'hui à l'église Sant'Andrea delle Fratte.">
+            <div class="stop-number">3</div>
+            <div class="stop-content">
+                <h3>Ponte Sant'Angelo</h3>
+                <div class="stop-meta">
+                    <span>📍 Sur le pont</span>
+                    <span>⏱ 10 min</span>
+                </div>
+                <p class="stop-description">
+                    Ce pont, construit par Hadrien en <strong>134 ap. J.-C.</strong>, devint au XVIIe siècle une galerie de sculpture à ciel ouvert. Le Bernin y plaça 10 anges portant les instruments de la Passion : éponge, lance, clous, couronne d'épines...
+                </p>
+
+                <div class="secret-box">
+                    <h4>🔮 Le Secret</h4>
+                    <p>Deux anges furent sculptés par le Bernin lui-même : l'ange à la couronne d'épines et l'ange au titre de la croix. Le pape Clément IX les trouva si beaux qu'il refusa de les exposer aux intempéries. Vous voyez ici des copies ; les originaux sont à l'église Sant'Andrea delle Fratte, au calme.</p>
+                </div>
+
+                <div class="secret-box">
+                    <h4>🎭 Le Détail Macabre</h4>
+                    <p>Pendant des siècles, les corps des condamnés à mort étaient exposés ici. La tête de Béatrice Cenci resta sur le pont pendant des jours. Les Romains avaient l'habitude de commenter les exécutions comme aujourd'hui on commente le football.</p>
+                </div>
+
+                <div class="photo-tip">
+                    <strong>📸 Conseil photo :</strong> Au centre du pont, face à Saint-Pierre, vous obtenez l'alignement parfait du dôme encadré par les anges. Le matin, la lumière vient de derrière vous. Le soir, le dôme est en silhouette dorée.
+                </div>
+
+                <div class="directions">
+                    <strong>➡️ Pour continuer :</strong> Après le pont, prenez immédiatement la première rue à gauche : Via dei Coronari, la rue des antiquaires.
+                </div>
+
+                <button class="play-stop-btn" onclick="speakStop(3)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Écouter
+                </button>
+            </div>
+        </article>
+
+        <!-- STOP 4 -->
+        <article class="stop" id="stop4" data-audio="Bienvenue sur la Via dei Coronari, l'une des rues les plus charmantes et les moins touristiques de Rome. Son nom vient des vendeurs de rosaires, les coronari, qui s'installèrent ici pour servir les pèlerins en route vers Saint-Pierre. Aujourd'hui, c'est la rue des antiquaires. Regardez les façades médiévales et Renaissance, les madones dans leurs niches éclairées la nuit. Cette rue a été pavée au 15ème siècle par le pape Sixte IV pour faciliter le passage des pèlerins. À mi-chemin, cherchez la petite Piazza di San Salvatore in Lauro : une oasis de calme avec une église que personne ne visite.">
+            <div class="stop-number">4</div>
+            <div class="stop-content">
+                <h3>Via dei Coronari</h3>
+                <div class="stop-meta">
+                    <span>📍 Rue piétonne</span>
+                    <span>⏱ 10 min de promenade</span>
+                </div>
+                <p class="stop-description">
+                    Cette rue sinueuse était l'artère des vendeurs de <strong>rosaires</strong> (corone) pour les pèlerins en route vers Saint-Pierre. Aujourd'hui, c'est le paradis des antiquaires. Chaque vitrine est un musée miniature.
+                </p>
+
+                <div class="secret-box">
+                    <h4>🔮 Le Secret</h4>
+                    <p>Levez les yeux : les <strong>Madonne</strong> dans leurs niches éclairées. Rome en compte plus de 500. Celles de Via dei Coronari sont parmi les plus anciennes. Au Moyen Âge, elles servaient d'éclairage public ET de protection divine. Les voleurs les évitaient... ou priaient avant d'attaquer.</p>
+                </div>
+
+                <div class="photo-tip">
+                    <strong>📸 Conseil photo :</strong> Au n°156, une façade Renaissance avec des fresques fanées. Photographiez les détails : chaque couche de temps est visible.
+                </div>
+
+                <div class="directions">
+                    <strong>➡️ Pour continuer :</strong> Au bout de Via dei Coronari, tournez à droite sur Via di Tor Millina. Vous déboucherez sur Piazza Navona par le côté nord, moins bondé.
+                </div>
+
+                <button class="play-stop-btn" onclick="speakStop(4)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Écouter
+                </button>
+            </div>
+        </article>
+
+        <!-- STOP 5 -->
+        <article class="stop" id="stop5" data-audio="Piazza Navona, la plus baroque des places romaines, occupe exactement l'emplacement du Stade de Domitien, construit en 86 après Jésus-Christ. 30 000 spectateurs venaient y voir des athlètes grecs concourir. La forme elliptique de la place suit les tribunes antiques. Au centre, la Fontaine des Quatre Fleuves du Bernin représente les quatre continents alors connus à travers leurs grands fleuves : le Danube pour l'Europe, le Gange pour l'Asie, le Nil pour l'Afrique avec la tête voilée car sa source était inconnue, et le Rio de la Plata pour les Amériques. Une légende dit que le Nil se voile la face pour ne pas voir l'église de Borromini en face, rival du Bernin. C'est faux : la fontaine fut terminée avant l'église !">
+            <div class="stop-number">5</div>
+            <div class="stop-content">
+                <h3>Piazza Navona</h3>
+                <div class="stop-meta">
+                    <span>📍 Place centrale</span>
+                    <span>⏱ 20 min</span>
+                </div>
+                <p class="stop-description">
+                    Cette ellipse parfaite épouse la forme du <strong>Stade de Domitien</strong> (86 ap. J.-C.), où 30 000 spectateurs venaient applaudir des athlètes grecs. Sous vos pieds, les tribunes antiques existent toujours (visitables sous la place).
+                </p>
+
+                <div class="secret-box">
+                    <h4>🔮 Le Secret de la Fontaine</h4>
+                    <p>La <strong>Fontaine des Quatre Fleuves</strong> du Bernin représente les continents connus : Danube (Europe), Gange (Asie), Rio de la Plata (Amériques), Nil (Afrique). Le Nil a la tête voilée car sa source était encore inconnue ! On raconte que le Rio de la Plata lève le bras pour se protéger si l'église de Borromini s'effondrait. Faux : la fontaine fut terminée AVANT l'église. Mais la rivalité Bernin-Borromini était bien réelle et féroce.</p>
+                </div>
+
+                <div class="secret-box">
+                    <h4>🌊 L'Anecdote</h4>
+                    <p>Jusqu'en 1866, chaque week-end d'août, on bouchait les fontaines pour inonder la place. Les nobles faisaient des tours en calèche dans l'eau, les gamins pataugeaient. La police devait chasser ceux qui pêchaient les pièces jetées par les spectateurs.</p>
+                </div>
+
+                <div class="photo-tip">
+                    <strong>📸 Conseil photo :</strong> Depuis l'extrémité nord, vous capturez les trois fontaines alignées avec Sant'Agnese en fond. Pour les détails de la fontaine centrale, le meilleur angle est côté église (lumière de face l'après-midi).
+                </div>
+
+                <div class="directions">
+                    <strong>➡️ Pour continuer :</strong> Quittez la place par le sud (Via dei Canestrari), puis prenez Via della Rotonda. En 5 minutes, le Panthéon se dévoile.
+                </div>
+
+                <button class="play-stop-btn" onclick="speakStop(5)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Écouter
+                </button>
+            </div>
+        </article>
+
+        <!-- STOP 6 -->
+        <article class="stop" id="stop6" data-audio="Le Panthéon est le bâtiment le mieux préservé de la Rome antique, et probablement le plus influent de l'histoire de l'architecture. Construit sous Hadrien vers 125 après Jésus-Christ, il a conservé son dôme en béton intact pendant près de 2000 ans. Ce dôme reste le plus grand dôme en béton non armé jamais construit. Son diamètre de 43 mètres est exactement égal à sa hauteur : une sphère parfaite pourrait s'y inscrire. L'oculus, l'ouverture au sommet, fait 9 mètres de diamètre. Quand il pleut, oui, l'eau entre, mais elle s'évacue par 22 trous invisibles dans le sol légèrement incurvé. Entrez : c'est gratuit et sans file d'attente en ce moment.">
+            <div class="stop-number">6</div>
+            <div class="stop-content">
+                <h3>Le Panthéon</h3>
+                <div class="stop-meta">
+                    <span>📍 Piazza della Rotonda</span>
+                    <span>⏱ 20 min</span>
+                    <span>💰 Entrée gratuite (réservation parfois requise)</span>
+                </div>
+                <p class="stop-description">
+                    Le bâtiment le plus influent de l'histoire de l'architecture. Construit par Hadrien vers <strong>125 ap. J.-C.</strong>, son dôme en béton non armé reste le plus grand jamais construit. Son diamètre (43,3 m) égale exactement sa hauteur : une sphère parfaite s'y inscrirait.
+                </p>
+
+                <div class="secret-box">
+                    <h4>🔮 Le Secret du Béton</h4>
+                    <p>Comment ce dôme tient-il depuis 1900 ans ? Le béton romain contenait de la <strong>poite volcanique</strong> et s'allège vers le sommet (pierre ponce au lieu de basalte). L'oculus de 9 mètres n'est pas juste décoratif : il allège le sommet et crée une compression qui stabilise la structure. Quand il pleut, l'eau entre et sort par 22 trous invisibles dans le sol incurvé.</p>
+                </div>
+
+                <div class="secret-box">
+                    <h4>🎭 L'Anecdote</h4>
+                    <p>Le 21 avril (fondation de Rome), à midi exactement, un rayon de soleil traverse l'oculus et éclaire la porte d'entrée. Coïncidence ? L'empereur entrait précisément à ce moment, auréolé de lumière divine. Le Panthéon était une machine de propagande autant qu'un temple.</p>
+                </div>
+
+                <div class="photo-tip">
+                    <strong>📸 Conseil photo :</strong> À l'intérieur, placez-vous au centre exact (un cercle est gravé au sol). Photographiez vers le haut : le cercle de ciel dans l'oculus. Entre 12h et 14h, le rayon de lumière balaie les murs.
+                </div>
+
+                <div class="directions">
+                    <strong>➡️ Pour continuer :</strong> En sortant, tournez à gauche. Derrière le Panthéon, sur la Piazza della Minerva, vous verrez l'éléphant du Bernin.
+                </div>
+
+                <button class="play-stop-btn" onclick="speakStop(6)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Écouter
+                </button>
+            </div>
+        </article>
+
+        <!-- STOP 7 -->
+        <article class="stop" id="stop7" data-audio="Ce petit éléphant de marbre portant un obélisque égyptien est l'une des œuvres les plus charmantes de Rome. Le Bernin le conçut en 1667 pour le pape Alexandre VII. L'obélisque date du 6ème siècle avant Jésus-Christ et fut découvert dans le jardin du couvent voisin. Les Romains l'appellent affectueusement il Pulcino, le poussin, car ils trouvaient l'éléphant trop petit. Le Bernin voulait montrer qu'il faut une intelligence robuste, comme celle de l'éléphant, pour supporter la sagesse antique. Regardez la direction de la queue de l'éléphant : elle pointe vers le couvent des Dominicains. Une insulte délibérée du Bernin qui les détestait.">
+            <div class="stop-number">7</div>
+            <div class="stop-content">
+                <h3>L'Éléphant de la Minerva</h3>
+                <div class="stop-meta">
+                    <span>📍 Piazza della Minerva</span>
+                    <span>⏱ 5 min</span>
+                </div>
+                <p class="stop-description">
+                    Cet éléphant de marbre portant un obélisque égyptien du VIe siècle av. J.-C. fut conçu par le Bernin en 1667. Les Romains l'appellent affectueusement <em>il Pulcino</em> (le poussin) car ils le trouvent ridiculement petit.
+                </p>
+
+                <div class="secret-box">
+                    <h4>🔮 Le Secret Vengeur</h4>
+                    <p>Regardez où pointe l'arrière-train de l'éléphant : vers le couvent des <strong>Dominicains</strong>. Délibéré ? Absolument. Les moines avaient critiqué le projet du Bernin, exigeant qu'on ajoute un bloc sous l'éléphant pour plus de stabilité. Le Bernin leur a rendu la politesse... pour l'éternité.</p>
+                </div>
+
+                <div class="photo-tip">
+                    <strong>📸 Conseil photo :</strong> Photographiez l'éléphant avec la façade gothique de Santa Maria sopra Minerva en fond. C'est la seule église gothique de Rome !
+                </div>
+
+                <div class="directions">
+                    <strong>➡️ Pour continuer :</strong> Continuez vers le sud par Via del Gesù. En 10 minutes, vous atteindrez Piazza Venezia et le gigantesque Vittoriano.
+                </div>
+
+                <button class="play-stop-btn" onclick="speakStop(7)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Écouter
+                </button>
+            </div>
+        </article>
+
+        <!-- STOP 8 -->
+        <article class="stop" id="stop8" data-audio="Devant vous, le Vittoriano, aussi appelé l'Altare della Patria ou la Machine à Écrire par les Romains moqueurs. Ce monument de marbre blanc de Brescia fut construit entre 1885 et 1935 pour célébrer Victor-Emmanuel II, premier roi de l'Italie unifiée. Les Romains le détestent avec passion. Pour le construire, on détruisit un quartier médiéval entier et une partie du Capitole. Mais montez les escaliers : la terrasse offre la plus belle vue sur les Forums, le Colisée et le dôme de Saint-Pierre. C'est gratuit. L'ascenseur panoramique pour le sommet absolu coûte 10 euros.">
+            <div class="stop-number">8</div>
+            <div class="stop-content">
+                <h3>Piazza Venezia & Vittoriano</h3>
+                <div class="stop-meta">
+                    <span>📍 Piazza Venezia</span>
+                    <span>⏱ 15 min</span>
+                    <span>💰 Terrasse gratuite, ascenseur 10€</span>
+                </div>
+                <p class="stop-description">
+                    Le "Gâteau de Mariage", la "Machine à Écrire"... les Romains ont inventé mille surnoms pour ce monument colossal en marbre blanc. Construit (1885-1935) pour Victor-Emmanuel II, il représente l'unité italienne... et la destruction d'un quartier médiéval entier.
+                </p>
+
+                <div class="secret-box">
+                    <h4>🔮 Le Secret</h4>
+                    <p>Sous vos pieds, enterré lors de la construction, se trouve un trésor archéologique : le <strong>tombeau de Bibulus</strong>, un édile romain du Ier siècle av. J.-C. Visible par une grille au coin nord-est de la place. Personne ne le remarque.</p>
+                </div>
+
+                <div class="secret-box">
+                    <h4>🎭 Le Balcon de Mussolini</h4>
+                    <p>Regardez le Palazzo Venezia à votre gauche. Le balcon d'angle était celui de Mussolini, d'où il haranguait les foules. Sa lumière restait allumée tard pour montrer qu'il "travaillait" — en réalité, il jouait du violon ou recevait des maîtresses.</p>
+                </div>
+
+                <div class="photo-tip">
+                    <strong>📸 Conseil photo :</strong> Montez gratuitement sur la terrasse centrale du Vittoriano. Vue à 180° sur les Forums et le Colisée. Meilleur moment : fin d'après-midi, lumière dorée.
+                </div>
+
+                <div class="directions">
+                    <strong>➡️ Pour continuer :</strong> Descendez vers la gauche du Vittoriano par Via del Teatro di Marcello. Vous passerez devant le théâtre antique en 5 minutes.
+                </div>
+
+                <button class="play-stop-btn" onclick="speakStop(8)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Écouter
+                </button>
+            </div>
+        </article>
+
+        <!-- STOP 9 -->
+        <article class="stop" id="stop9" data-audio="Ce bâtiment semi-circulaire, souvent ignoré des touristes pressés d'aller au Colisée, est le Théâtre de Marcellus, achevé en 13 avant Jésus-Christ par Auguste et dédié à son neveu Marcellus, mort jeune. Il pouvait accueillir 15 000 spectateurs. Regardez bien sa structure : elle a directement inspiré le Colisée, construit 100 ans plus tard. Les deux ordres d'arches superposés, dorique en bas, ionique au-dessus, sont le même schéma. Au Moyen Âge, les nobles Orsini transformèrent les ruines en forteresse, puis en palais Renaissance. Des familles y vivent encore aujourd'hui dans des appartements de luxe intégrés aux ruines antiques.">
+            <div class="stop-number">9</div>
+            <div class="stop-content">
+                <h3>Teatro di Marcello</h3>
+                <div class="stop-meta">
+                    <span>📍 Via del Teatro di Marcello</span>
+                    <span>⏱ 10 min</span>
+                </div>
+                <p class="stop-description">
+                    Ce demi-cercle de pierre, souvent ignoré, est le <strong>modèle du Colisée</strong>. Achevé en 13 av. J.-C. par Auguste pour son neveu Marcellus (mort à 19 ans), il pouvait accueillir 15 000 spectateurs. Les deux étages d'arches — dorique, ionique — furent copiés 100 ans plus tard.
+                </p>
+
+                <div class="secret-box">
+                    <h4>🔮 Le Secret</h4>
+                    <p>Des gens vivent <strong>encore ici</strong> ! Au XVIe siècle, la famille Orsini transforma les ruines en palais. Aujourd'hui, ces appartements avec vue sur le Forum sont parmi les plus chers de Rome. Imaginez : prendre votre café du matin sur une terrasse romaine antique.</p>
+                </div>
+
+                <div class="photo-tip">
+                    <strong>📸 Conseil photo :</strong> Les trois colonnes corinthiennes à droite du théâtre sont les restes du Temple d'Apollon Sosien (32 av. J.-C.). Capturez les deux ensemble : 2000 ans de recyclage architectural.
+                </div>
+
+                <div class="directions">
+                    <strong>➡️ Pour continuer :</strong> Continuez tout droit, puis tournez à gauche sur Lungotevere. Après 10 minutes, vous apercevrez la petite église de Santa Maria in Cosmedin et la Bocca della Verità.
+                </div>
+
+                <button class="play-stop-btn" onclick="speakStop(9)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Écouter
+                </button>
+            </div>
+        </article>
+
+        <!-- STOP 10 -->
+        <article class="stop" id="stop10" data-audio="La Bocca della Verità, la Bouche de la Vérité, est ce disque de marbre représentant un visage barbu, probablement un dieu fleuve comme le Tibre. Selon la légende médiévale, si vous mettez votre main dans sa bouche en disant un mensonge, elle vous la coupera. Cette croyance était si puissante qu'au Moyen Âge, on l'utilisait pour les serments judiciaires. On soupçonne qu'un homme armé d'une épée se tenait parfois derrière le disque pour punir les parjures avérés. Grégory Peck fit semblant de perdre sa main ici dans Vacances Romaines en 1953. Depuis, la file d'attente ne s'est jamais arrêtée.">
+            <div class="stop-number">10</div>
+            <div class="stop-content">
+                <h3>Bocca della Verità</h3>
+                <div class="stop-meta">
+                    <span>📍 Santa Maria in Cosmedin</span>
+                    <span>⏱ 10 min</span>
+                    <span>💰 Gratuit (file possible)</span>
+                </div>
+                <p class="stop-description">
+                    Ce disque de marbre représente probablement <strong>le dieu Tibre</strong> ou un mascaron de fontaine du Ier siècle. Mais sa légende est irrésistible : mettez votre main dans sa bouche. Si vous mentez, il vous la coupe.
+                </p>
+
+                <div class="secret-box">
+                    <h4>🔮 Le Secret</h4>
+                    <p>Au Moyen Âge, la Bocca servait vraiment de <strong>détecteur de mensonges judiciaire</strong>. Sauf qu'un homme armé d'une lame se tenait parfois derrière le mur pour "aider" le verdict. Gregory Peck fit semblant de perdre sa main ici dans "Vacances Romaines" (1953) — la réaction terrifiée d'Audrey Hepburn était réelle, il ne l'avait pas prévenue.</p>
+                </div>
+
+                <div class="secret-box">
+                    <h4>🏛️ L'Église Cachée</h4>
+                    <p>Derrière la Bocca, l'église Santa Maria in Cosmedin est un joyau médiéval négligé. Son sol <em>cosmatesque</em> (mosaïque géométrique) et son campanile du XIIe siècle valent le détour. Entrée gratuite, personne n'y va.</p>
+                </div>
+
+                <div class="photo-tip">
+                    <strong>📸 Conseil photo :</strong> Les temples romains en face (Forum Boarium) sont les mieux conservés de Rome. Temple de Portunus + Temple d'Hercule = zéro touristes, lumière parfaite au coucher du soleil.
+                </div>
+
+                <div class="directions">
+                    <strong>➡️ Pour continuer :</strong> Traversez la place et montez sur la colline de l'Aventin par Clivo di Rocca Savella. C'est une montée ombragée de 10 minutes vers le secret le mieux gardé de Rome.
+                </div>
+
+                <button class="play-stop-btn" onclick="speakStop(10)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Écouter
+                </button>
+            </div>
+        </article>
+
+        <!-- STOP 11 -->
+        <article class="stop" id="stop11" data-audio="Vous êtes devant la porte de la Villa du Priorat des Chevaliers de Malte, sur la colline de l'Aventin. Ce n'est qu'une porte verte dans un mur. Mais penchez-vous et regardez par le trou de la serrure. Vous verrez le dôme de Saint-Pierre, parfaitement encadré au bout d'une allée de cyprès. C'est l'une des vues les plus photographiées de Rome, mais seuls les initiés la connaissent. Ce point de vue traverse techniquement trois États : le territoire de l'Ordre de Malte, le territoire italien, et le Vatican au fond. Trois pays en un regard. Les Chevaliers de Malte occupent ce site depuis 1099 et ont leur propre ambassade, leurs timbres, leurs passeports.">
+            <div class="stop-number">11</div>
+            <div class="stop-content">
+                <h3>Trou de Serrure de Malte</h3>
+                <div class="stop-meta">
+                    <span>📍 Piazza dei Cavalieri di Malta</span>
+                    <span>⏱ 10 min</span>
+                    <span>💰 Gratuit</span>
+                </div>
+                <p class="stop-description">
+                    Voici le secret le mieux gardé de Rome. Une simple porte verte, un trou de serrure... et le dôme de <strong>Saint-Pierre parfaitement encadré</strong> au bout d'une allée de cyprès.
+                </p>
+
+                <div class="secret-box">
+                    <h4>🔮 Le Secret des Trois États</h4>
+                    <p>En regardant par ce trou, vous voyez à travers <strong>trois pays</strong> : l'Ordre souverain de Malte (territoire extraterritorial), l'Italie (au-delà du jardin), et le Vatican (le dôme). L'Ordre de Malte émet ses propres passeports, plaques d'immatriculation et timbres, bien qu'il n'ait que ce jardin comme "territoire".</p>
+                </div>
+
+                <div class="photo-tip">
+                    <strong>📸 Conseil photo :</strong> Placez votre téléphone contre le trou de serrure. Mode portrait désactivé. La mise au point automatique fera le reste. Les files sont courtes après 17h.
+                </div>
+
+                <div class="directions">
+                    <strong>➡️ Pour continuer :</strong> Longez la Via di Santa Sabina (100 m). Le Giardino degli Aranci est sur votre gauche.
+                </div>
+
+                <button class="play-stop-btn" onclick="speakStop(11)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Écouter
+                </button>
+            </div>
+        </article>
+
+        <!-- STOP 12 -->
+        <article class="stop" id="stop12" data-audio="Le Giardino degli Aranci, le Jardin des Orangers, est l'endroit parfait pour terminer votre promenade. Ce petit parc ombragé offre la plus belle vue panoramique sur Rome : le dôme de Saint-Pierre, le Tibre, le Trastevere, le Gianicolo. Les orangers amers furent plantés par des moines au 15ème siècle. Derrière vous, l'église Santa Sabina du 5ème siècle conserve ses portes en bois originales, avec l'une des premières représentations connues de la crucifixion dans l'art. Entrez par curiosité : vous serez probablement seuls. Depuis ce jardin, vous pouvez descendre vers le Trastevere en 15 minutes pour un apéritif bien mérité.">
+            <div class="stop-number">12</div>
+            <div class="stop-content">
+                <h3>Giardino degli Aranci</h3>
+                <div class="stop-meta">
+                    <span>📍 Via di Santa Sabina</span>
+                    <span>⏱ 20 min</span>
+                    <span>💰 Gratuit</span>
+                </div>
+                <p class="stop-description">
+                    Le <strong>Jardin des Orangers</strong> : le panorama parfait pour conclure. Vue sur le dôme de Saint-Pierre, le Tibre serpentant, les toits ocre du Trastevere. Les orangers amers furent plantés par des moines au XVe siècle.
+                </p>
+
+                <div class="secret-box">
+                    <h4>🔮 Le Secret de Santa Sabina</h4>
+                    <p>L'église derrière vous, <strong>Santa Sabina</strong> (Ve siècle), possède ses portes en bois <em>originales</em>. Dans un panneau, l'une des plus anciennes représentations connues de la Crucifixion. Jésus n'a pas de croix visible — le symbole n'était pas encore fixé.</p>
+                </div>
+
+                <div class="secret-box">
+                    <h4>🍊 L'Arbre de Saint-Dominique</h4>
+                    <p>Dans le cloître attenant (sonnez pour entrer), un oranger planté par <strong>Saint Dominique lui-même</strong> en 1220 produit encore des fruits. Huit siècles de croissance continue.</p>
+                </div>
+
+                <div class="photo-tip">
+                    <strong>📸 Conseil photo :</strong> L'ouverture dans le mur (le "buco della serratura naturale") encadre Saint-Pierre parfaitement. Meilleur moment : coucher du soleil, le dôme devient doré.
+                </div>
+
+                <div class="directions">
+                    <strong>🎉 Fin du parcours !</strong> Descendez vers le Trastevere par Via di Santa Sabina et le Clivo di Rocca Savella (~15 min). Un Aperol Spritz vous attend sur la Piazza di Santa Maria in Trastevere.
+                </div>
+
+                <button class="play-stop-btn" onclick="speakStop(12)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Écouter
+                </button>
+            </div>
+        </article>
+    </section>
+
+    <!-- Practical Section -->
+    <section class="practical-section">
+        <div class="section-header" style="color: var(--marble);">
+            <p class="section-label">Avant de Partir</p>
+            <h2 class="section-title" style="color: var(--marble);">Infos Pratiques</h2>
+        </div>
+        <div class="practical-grid">
+            <div class="practical-card">
+                <h3>🚶 Détails du Parcours</h3>
+                <ul>
+                    <li><strong>Distance :</strong> ~6 km</li>
+                    <li><strong>Durée :</strong> 3-4 heures (avec arrêts)</li>
+                    <li><strong>Dénivelé :</strong> Faible sauf Aventin</li>
+                    <li><strong>Difficulté :</strong> Facile</li>
+                    <li><strong>Meilleur moment :</strong> Après 14h (moins de monde)</li>
+                </ul>
+            </div>
+            <div class="practical-card">
+                <h3>💧 À Emporter</h3>
+                <ul>
+                    <li>Bouteille d'eau (fontanelle partout)</li>
+                    <li>Chapeau et crème solaire</li>
+                    <li>Chaussures confortables</li>
+                    <li>Épaules couvertes pour les églises</li>
+                    <li>Téléphone chargé !</li>
+                </ul>
+            </div>
+            <div class="practical-card">
+                <h3>🍕 Pauses Recommandées</h3>
+                <ul>
+                    <li><strong>Caffè :</strong> Sant'Eustachio (près Panthéon)</li>
+                    <li><strong>Gelato :</strong> Giolitti (Via degli Uffici del Vicario)</li>
+                    <li><strong>Supplì :</strong> Supplì Roma (Via dei Banchi Vecchi)</li>
+                    <li><strong>Apéro final :</strong> Bar San Calisto (Trastevere)</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <p>Audioguide créé avec ❤️ pour une balade romaine inoubliable</p>
+        <p style="margin-top: 0.5rem;">Ce guide est open source — <a href="https://github.com" target="_blank">disponible sur GitHub</a></p>
+    </footer>
+
+    <!-- Audio Controls -->
+    <div class="audio-controls">
+        <button class="audio-btn" id="playAllBtn" onclick="toggleAudioGuide()" title="Lire tout le guide">
+            <svg id="playIcon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="pauseIcon" viewBox="0 0 24 24" fill="currentColor" style="display:none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+        </button>
+        <button class="audio-btn" id="stopBtn" onclick="stopAudio()" title="Arrêter">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
+        </button>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Map initialization
+        const stops = [
+            { id: 1, name: "Via Cola di Rienzo", lat: 41.9068, lng: 12.4654 },
+            { id: 2, name: "Castel Sant'Angelo", lat: 41.9031, lng: 12.4663 },
+            { id: 3, name: "Ponte Sant'Angelo", lat: 41.9012, lng: 12.4665 },
+            { id: 4, name: "Via dei Coronari", lat: 41.8995, lng: 12.4695 },
+            { id: 5, name: "Piazza Navona", lat: 41.8992, lng: 12.4731 },
+            { id: 6, name: "Panthéon", lat: 41.8986, lng: 12.4769 },
+            { id: 7, name: "Éléphant Minerva", lat: 41.8977, lng: 12.4783 },
+            { id: 8, name: "Vittoriano", lat: 41.8946, lng: 12.4833 },
+            { id: 9, name: "Teatro Marcello", lat: 41.8920, lng: 12.4805 },
+            { id: 10, name: "Bocca della Verità", lat: 41.8882, lng: 12.4815 },
+            { id: 11, name: "Trou de Serrure", lat: 41.8836, lng: 12.4791 },
+            { id: 12, name: "Giardino degli Aranci", lat: 41.8843, lng: 12.4778 }
+        ];
+
+        const map = L.map('map').setView([41.8950, 12.4750], 14);
+        
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(map);
+
+        // Custom marker icon
+        const createIcon = (number) => L.divIcon({
+            className: 'custom-marker',
+            html: `<div style="
+                background: #C4785A;
+                color: white;
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-weight: bold;
+                font-size: 14px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+                border: 2px solid white;
+            ">${number}</div>`,
+            iconSize: [32, 32],
+            iconAnchor: [16, 16]
+        });
+
+        // Add markers
+        stops.forEach(stop => {
+            L.marker([stop.lat, stop.lng], { icon: createIcon(stop.id) })
+                .addTo(map)
+                .bindPopup(`<strong>${stop.id}. ${stop.name}</strong>`)
+                .on('click', () => {
+                    document.getElementById(`stop${stop.id}`).scrollIntoView({ behavior: 'smooth' });
+                });
+        });
+
+        // Draw route line
+        const routeCoords = stops.map(s => [s.lat, s.lng]);
+        L.polyline(routeCoords, {
+            color: '#C4785A',
+            weight: 3,
+            opacity: 0.7,
+            dashArray: '10, 10'
+        }).addTo(map);
+
+        // Speech synthesis
+        let synth = window.speechSynthesis;
+        let currentUtterance = null;
+        let isPlaying = false;
+        let currentStopIndex = 0;
+
+        function getAudioText(stopNum) {
+            const stopEl = document.getElementById(`stop${stopNum}`);
+            return stopEl ? stopEl.dataset.audio : '';
+        }
+
+        function speakStop(stopNum) {
+            stopAudio();
+            const text = getAudioText(stopNum);
+            if (!text) return;
+
+            currentUtterance = new SpeechSynthesisUtterance(text);
+            currentUtterance.lang = 'fr-FR';
+            currentUtterance.rate = 0.9;
+            
+            // Try to use a French voice
+            const voices = synth.getVoices();
+            const frenchVoice = voices.find(v => v.lang.startsWith('fr'));
+            if (frenchVoice) currentUtterance.voice = frenchVoice;
+
+            synth.speak(currentUtterance);
+            isPlaying = true;
+            updatePlayButton();
+            
+            // Highlight current stop
+            document.querySelectorAll('.stop').forEach(s => s.classList.remove('active'));
+            document.getElementById(`stop${stopNum}`).classList.add('active');
+        }
+
+        function toggleAudioGuide() {
+            if (isPlaying) {
+                synth.pause();
+                isPlaying = false;
+            } else {
+                if (synth.paused) {
+                    synth.resume();
+                } else {
+                    speakStop(1);
+                }
+                isPlaying = true;
+            }
+            updatePlayButton();
+        }
+
+        function stopAudio() {
+            synth.cancel();
+            isPlaying = false;
+            updatePlayButton();
+        }
+
+        function updatePlayButton() {
+            document.getElementById('playIcon').style.display = isPlaying ? 'none' : 'block';
+            document.getElementById('pauseIcon').style.display = isPlaying ? 'block' : 'none';
+            document.getElementById('playAllBtn').classList.toggle('playing', isPlaying);
+        }
+
+        // Progress bar
+        window.addEventListener('scroll', () => {
+            const winScroll = document.body.scrollTop || document.documentElement.scrollTop;
+            const height = document.documentElement.scrollHeight - document.documentElement.clientHeight;
+            const scrolled = (winScroll / height) * 100;
+            document.getElementById('progressBar').style.width = scrolled + '%';
+        });
+
+        // Load voices
+        synth.onvoiceschanged = () => synth.getVoices();
+    </script>
+</body>
+</html>
